@@ -1,14 +1,3 @@
-"""
-NTCompanion Pro - High-Performance Scraper for NTTuner
-======================================================
-Uses the proven urllib scraping approach from a.py + ThreadPoolExecutor for concurrency
-- Working HTTP stack with reliable content extraction
-- Concurrent scraping (10-50x faster than single-threaded)
-- Bloom filter deduplication
-- Enhanced proxy management
-- Priority crawl queue
-- Simple, reliable link extraction and crawling
-"""
 
 import dearpygui.dearpygui as dpg
 import json
