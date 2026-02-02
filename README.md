@@ -1,8 +1,6 @@
 # NTCompanion Pro - High-Performance Web Scraper for NTTuner
 
-[![Version](https://img.shields.io/badge/version-build.2026.05.Pro-blue.svg)](https://github.com/noosed/NTTuner)
-[![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
+<img width="1000" height="720" alt="image" src="https://github.com/user-attachments/assets/6fafa158-bb00-4a2c-b66a-8a8d258099ba" />
 
 **Professional-grade web scraper with concurrent processing, intelligent crawling, and proxy support for building high-quality LLM training datasets.**
 
