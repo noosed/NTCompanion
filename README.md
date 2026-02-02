@@ -1,6 +1,7 @@
 # NTCompanion Pro - High-Performance Web Scraper for NTTuner
 
-<img width="1000" height="720" alt="image" src="https://github.com/user-attachments/assets/6fafa158-bb00-4a2c-b66a-8a8d258099ba" />
+<img width="1000" height="720" alt="image" src="https://github.com/user-attachments/assets/d11cf703-e21f-4b95-b355-74c4e2924b52" />
+
 
 **Professional-grade web scraper with concurrent processing, intelligent crawling, and proxy support for building high-quality LLM training datasets.**
 
