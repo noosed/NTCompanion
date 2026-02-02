@@ -1,4 +1,4 @@
-# NTCompanion Pro - High-Performance Web Scraper for NTTuner
+# NTCompanion  - High-Performance Web Scraper for NTTuner
 
 [![Version](https://img.shields.io/badge/version-build.2026.05.Pro-blue.svg)](https://github.com/noosed/NTTuner)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://www.python.org/)
