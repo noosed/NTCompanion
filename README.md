@@ -3,6 +3,8 @@
 [![Version](https://img.shields.io/badge/version-build.2026.05.Pro-blue.svg)](https://github.com/noosed/NTTuner)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
+<img width="400" height="342" alt="image" src="https://github.com/user-attachments/assets/d6e5f02f-0b93-46d3-abe6-a4170b4bc996" />
+
 
 **Professional-grade web scraper with concurrent processing, intelligent crawling, and proxy support for building high-quality LLM training datasets.**
 
