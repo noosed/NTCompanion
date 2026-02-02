@@ -60,7 +60,7 @@ pip install mmh3  # For memory-efficient Bloom filter deduplication
 
 ### 1. Installation
 ```bash
-# Clone or download bIG.py
+# Clone or download NTCompanion.py
 git clone https://github.com/noosed/NTTuner.git
 cd NTTuner
 
@@ -70,7 +70,7 @@ pip install dearpygui pyperclip mmh3
 
 ### 2. Basic Usage
 ```bash
-python bIG.py
+python NTCompanion.py
 ```
 
 ### 3. Configure Your First Scrape
