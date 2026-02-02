@@ -654,3 +654,5 @@ Output: 34,000 pages, 892MB
 **Built for the LLM training community**
 
 *Happy Scraping!*
+
+Created by github.com/noosed
