@@ -1,3 +1,8 @@
+<img width="1030" height="942" alt="image" src="https://github.com/user-attachments/assets/f24587bf-1ba1-48c1-957d-3d8fb41daec0" />
+
+
+
+
 Key Improvements
 1. Simplified Content Extraction (extract_text_content)
 
