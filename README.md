@@ -1,24 +1,22 @@
-# NTCompanion  - High-Performance Web Scraper for NTTuner
+# NTCompanion Pro - High-Performance Web Scraper for NTTuner
 
 [![Version](https://img.shields.io/badge/version-build.2026.05.Pro-blue.svg)](https://github.com/noosed/NTTuner)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
-<img width="400" height="342" alt="image" src="https://github.com/user-attachments/assets/d6e5f02f-0b93-46d3-abe6-a4170b4bc996" />
-
 
 **Professional-grade web scraper with concurrent processing, intelligent crawling, and proxy support for building high-quality LLM training datasets.**
 
 ---
 
-## 🚀 Features
+## Features
 
 ### Core Capabilities
-- **🔥 Concurrent Scraping**: 10-50x faster than single-threaded with ThreadPoolExecutor
-- **🕷️ Intelligent Crawler**: Follow links with configurable depth and domain restrictions
-- **🎭 Proxy Support**: 20+ proxy sources with automatic rotation and health tracking
-- **💾 Memory-Efficient**: Bloom filter deduplication for handling millions of URLs
-- **⚡ Rate Limiting**: Per-domain delays to avoid overwhelming servers
-- **📊 Real-Time Stats**: Live monitoring of success/failure rates and processing speed
+- **Concurrent Scraping**: 10-50x faster than single-threaded with ThreadPoolExecutor
+- **Intelligent Crawler**: Follow links with configurable depth and domain restrictions
+- **Proxy Support**: 20+ proxy sources with automatic rotation and health tracking
+- **Memory-Efficient**: Bloom filter deduplication for handling millions of URLs
+- **Rate Limiting**: Per-domain delays to avoid overwhelming servers
+- **Real-Time Stats**: Live monitoring of success/failure rates and processing speed
 
 ### Content Processing
 - **Smart Text Extraction**: Proven regex-based content cleaning
@@ -36,7 +34,7 @@
 
 ---
 
-## 📋 Requirements
+## Requirements
 
 ### Python Dependencies
 ```bash
@@ -56,7 +54,7 @@ pip install mmh3  # For memory-efficient Bloom filter deduplication
 
 ---
 
-## 🎯 Quick Start
+## Quick Start
 
 ### 1. Installation
 ```bash
@@ -86,7 +84,7 @@ python NTCompanion.py
 
 ---
 
-## 📖 Detailed Guide
+## Detailed Guide
 
 ### Source Manifest
 Enter URLs to scrape, one per line:
@@ -164,8 +162,8 @@ Depth 3: Homepage + articles + linked resources
 ### Filter Configuration
 
 **Content Cleaning:**
-- ✅ **Remove Code Blocks**: Strip `<pre>` and `<code>` tags
-- ✅ **Collapse Whitespace**: Normalize spacing (recommended)
+- **Remove Code Blocks**: Strip `<pre>` and `<code>` tags
+- **Collapse Whitespace**: Normalize spacing (recommended)
 
 **Size Constraints:**
 - **Min Chars**: 300 (default) - Skip content that's too short
@@ -225,7 +223,7 @@ Provide detailed, accurate explanations with examples.
 
 ---
 
-## 🎮 Usage Examples
+## Usage Examples
 
 ### Example 1: Simple Article Scraping
 ```
@@ -269,7 +267,7 @@ Output: 312 high-quality tutorials
 
 ---
 
-## 📊 Understanding Statistics
+## Understanding Statistics
 
 ### Live Stats Display
 ```
@@ -303,7 +301,7 @@ Speed: 8.2/s     # Current processing rate (pages/second)
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Issue: "No valid URLs" error
 **Solution:** Ensure URLs start with `http://` or `https://`
@@ -345,7 +343,7 @@ Speed: 8.2/s     # Current processing rate (pages/second)
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### Core Components
 
@@ -406,7 +404,7 @@ Speed: 8.2/s     # Current processing rate (pages/second)
 
 ---
 
-## 📁 File Structure
+## File Structure
 
 ```
 NTTuner/
@@ -421,7 +419,7 @@ NTTuner/
 
 ---
 
-## 🎯 Best Practices
+## Best Practices
 
 ### Performance Optimization
 1. **Start conservative**: 5-10 workers, test on small URL set
@@ -449,7 +447,7 @@ NTTuner/
 
 ---
 
-## 🔒 Rate Limiting & Ethics
+## Rate Limiting & Ethics
 
 ### Built-in Protections
 - **Per-domain delays**: Never hammer a single server
@@ -473,17 +471,17 @@ Max Retries: 2-3 attempts
 5. **Cache results**: Don't re-scrape unnecessarily
 
 ### Legal Considerations
-- ⚠️ This tool is for **educational and research purposes**
-- ⚠️ Respect copyright, terms of service, and privacy laws
-- ⚠️ Public data ≠ legal to scrape (jurisdiction-dependent)
-- ⚠️ Commercial use may require permissions/licenses
-- ✅ Use for personal learning and open research
-- ✅ Cite sources in published datasets
-- ✅ Remove sensitive content if discovered
+- This tool is for **educational and research purposes**
+- Respect copyright, terms of service, and privacy laws
+- Public data ≠ legal to scrape (jurisdiction-dependent)
+- Commercial use may require permissions/licenses
+- Use for personal learning and open research
+- Cite sources in published datasets
+- Remove sensitive content if discovered
 
 ---
 
-## 🐛 Known Limitations
+## Known Limitations
 
 ### Technical
 - **No JavaScript rendering**: Can't scrape SPAs or dynamic content
@@ -504,15 +502,15 @@ Max Retries: 2-3 attempts
 
 ---
 
-## 🔄 Updates & Changelog
+## Updates & Changelog
 
 ### v2026.05.Pro-ThreadPool (Current)
-- ✨ Integrated proven scraper from a.py
-- ⚡ Simplified content extraction for better reliability
-- 🔗 Improved link discovery algorithm
-- 🧹 Removed complex, unnecessary code paths
-- 📊 Enhanced error handling and logging
-- 🐛 Fixed encoding issues with non-UTF8 content
+- Integrated proven scraper from a.py
+- Simplified content extraction for better reliability
+- Improved link discovery algorithm
+- Removed complex, unnecessary code paths
+- Enhanced error handling and logging
+- Fixed encoding issues with non-UTF8 content
 
 ### v2026.03.Pro (Previous)
 - Initial ThreadPool-based concurrent scraper
@@ -522,7 +520,7 @@ Max Retries: 2-3 attempts
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 This tool is part of the **NTTuner** ecosystem. Contributions welcome!
 
@@ -545,7 +543,7 @@ This tool is part of the **NTTuner** ecosystem. Contributions welcome!
 
 ---
 
-## 📞 Support
+## Support
 
 ### Documentation
 - **This README**: Comprehensive guide
@@ -570,7 +568,7 @@ head -n 5 nttuner_dataset.jsonl | python -m json.tool
 
 ---
 
-## 📜 License
+## License
 
 This project is part of NTTuner and follows its licensing terms.
 
@@ -578,7 +576,7 @@ This project is part of NTTuner and follows its licensing terms.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **DearPyGUI**: Modern GPU-accelerated Python GUI framework
 - **urllib**: Python's reliable HTTP library
@@ -587,7 +585,7 @@ This project is part of NTTuner and follows its licensing terms.
 
 ---
 
-## 🎓 Learning Resources
+## Learning Resources
 
 ### Web Scraping
 - Respect robots.txt and rate limits
@@ -607,7 +605,7 @@ This project is part of NTTuner and follows its licensing terms.
 
 ---
 
-## 📈 Performance Benchmarks
+## Performance Benchmarks
 
 ### Single Domain (Blog)
 ```
@@ -643,7 +641,7 @@ Output: 34,000 pages, 892MB
 
 ---
 
-## 🚦 Version Compatibility
+## Version Compatibility
 
 | Component | Minimum | Recommended | Tested |
 |-----------|---------|-------------|--------|
@@ -655,6 +653,6 @@ Output: 34,000 pages, 892MB
 
 ---
 
-**Built with ❤️ for the LLM training community**
+**Built for the LLM training community**
 
-*Happy Scraping! 🕷️*
+*Happy Scraping!*
