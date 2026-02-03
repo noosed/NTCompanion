@@ -1,4 +1,3 @@
-
 import dearpygui.dearpygui as dpg
 import json
 import os
@@ -24,6 +23,7 @@ import queue
 # Windows sound (optional)
 try:
     import winsound
+
     HAS_WINSOUND = True
 except ImportError:
     HAS_WINSOUND = False
@@ -31,6 +31,7 @@ except ImportError:
 # Optional: Bloom filter for memory-efficient dedup
 try:
     import mmh3
+
     HAS_MMH3 = True
 except ImportError:
     HAS_MMH3 = False
@@ -41,7 +42,7 @@ except ImportError:
 # ================================================================
 CONFIG_FILE = "nttuner_config_pro.json"
 INI_FILE = "ntcompanion_pro.ini"
-VERSION = "build.2026.05.Pro-ThreadPool"
+VERSION = "build.2026.05.Pro+Enhanced+ContentTypes"
 MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB
 
 # Concurrency defaults
@@ -127,6 +128,74 @@ MODEL_TEMPLATES = {
 DEFAULT_TEMPLATE_KEY = "Meta Llama-3.1 / 3.2 / 3.3 Instruct"
 DEFAULT_SYSTEM = "You are a helpful and honest assistant."
 
+# ================================================================
+# CONTENT TYPE CONFIGURATIONS
+# ================================================================
+CONTENT_TYPES = {
+    "Recipe": {
+        "user_prompt_template": "How do I make {title}?",
+        "detail_sections": ["Ingredients", "Instructions"],
+        "system_prompt": "You are a helpful and honest assistant.",
+        "example_titles": ["Chocolate Cake", "Spaghetti Carbonara", "Thai Green Curry"]
+    },
+    "Tutorial": {
+        "user_prompt_template": "How do I {title}?",
+        "detail_sections": ["Requirements", "Steps", "Tips"],
+        "system_prompt": "You are a helpful technical assistant.",
+        "example_titles": ["set up a web server", "configure SSH keys", "build a Docker container"]
+    },
+    "Product Info": {
+        "user_prompt_template": "Tell me about {title}",
+        "detail_sections": ["Features", "Specifications", "Reviews"],
+        "system_prompt": "You are a helpful product information assistant.",
+        "example_titles": ["iPhone 15 Pro", "Sony WH-1000XM5", "Tesla Model 3"]
+    },
+    "Article/Blog": {
+        "user_prompt_template": "Please provide detailed information about {title}",
+        "detail_sections": ["Summary", "Key Points", "Conclusion"],
+        "system_prompt": "You are a helpful and honest assistant.",
+        "example_titles": ["Climate Change Effects", "Machine Learning Basics", "Remote Work Tips"]
+    },
+    "Documentation": {
+        "user_prompt_template": "Explain {title}",
+        "detail_sections": ["Overview", "Usage", "Examples", "Parameters"],
+        "system_prompt": "You are a technical documentation assistant.",
+        "example_titles": ["React Hooks API", "Python asyncio", "Git branching"]
+    },
+    "FAQ": {
+        "user_prompt_template": "How do I {title}",
+        "detail_sections": ["Questions", "Answers"],
+        "system_prompt": "You are a helpful and honest assistant.",
+        "example_titles": ["reset my password", "contact support", "cancel subscription"]
+    },
+    "News": {
+        "user_prompt_template": "Summarize: {title}",
+        "detail_sections": ["Summary", "Details", "Context"],
+        "system_prompt": "You are a news summarization assistant.",
+        "example_titles": ["Latest Tech Announcements", "Stock Market Update", "Political Summit"]
+    },
+    "Research Paper": {
+        "user_prompt_template": "Explain the research paper: {title}",
+        "detail_sections": ["Abstract", "Methods", "Results", "Conclusions"],
+        "system_prompt": "You are an academic research assistant.",
+        "example_titles": ["Attention Is All You Need", "Deep Learning for NLP"]
+    },
+    "Medical Info": {
+        "user_prompt_template": "Provide information about {title}",
+        "detail_sections": ["Overview", "Symptoms", "Treatment", "Prevention"],
+        "system_prompt": "You are a medical information assistant. Provide factual information but remind users to consult healthcare professionals.",
+        "example_titles": ["Type 2 Diabetes", "Hypertension Management"]
+    },
+    "Custom": {
+        "user_prompt_template": "{title}",
+        "detail_sections": [],
+        "system_prompt": "You are a helpful and honest assistant.",
+        "example_titles": [""]
+    }
+}
+
+DEFAULT_CONTENT_TYPE = "Recipe"
+
 # Expanded Proxy Sources
 PROXY_SOURCES = {
     "ProxyScrape HTTPS": "https://api.proxyscrape.com/v2/?request=getproxies&protocol=https&timeout=10000&country=all&ssl=yes&anonymity=all",
@@ -150,6 +219,15 @@ PROXY_SOURCES = {
     "Proxy-List-Download HTTP": "https://www.proxy-list.download/api/v1/get?type=http",
     "Proxy-List-Download HTTPS": "https://www.proxy-list.download/api/v1/get?type=https",
 }
+
+# Common subdomains for discovery
+COMMON_SUBDOMAINS = [
+    'www', 'blog', 'shop', 'store', 'api', 'dev', 'docs', 'support', 'help',
+    'portal', 'app', 'mobile', 'cdn', 'static', 'images', 'media', 'news',
+    'community', 'forum', 'wiki', 'learn', 'training', 'academy', 'education',
+    'status', 'dashboard', 'admin', 'mail', 'webmail', 'secure', 'my',
+    'download', 'files', 'ftp', 'data', 'test', 'demo', 'beta', 'stage',
+]
 
 
 # ================================================================
@@ -293,9 +371,17 @@ class CrawlQueue:
     def set_seed_domains(self, urls: List[str]):
         """Track which domains were in the initial seed"""
         for url in urls:
+            # Get full domain
             domain = get_domain(url)
             if domain:
                 self.seed_domains.add(domain)
+
+                # Also add root domain for subdomain support
+                # e.g., www.example.com -> example.com
+                parts = domain.split('.')
+                if len(parts) >= 2:
+                    root_domain = '.'.join(parts[-2:])
+                    self.seed_domains.add(root_domain)
 
     def _calculate_priority(self, url: str, depth: int, prioritize_content: bool) -> int:
         """Lower number = higher priority"""
@@ -333,7 +419,7 @@ class CrawlQueue:
 
             # Check depth limit
             max_depth = config.get('max_depth', 3)
-            if depth > max_depth:
+            if depth >= max_depth:
                 return False
 
             # Check domain limit
@@ -344,7 +430,18 @@ class CrawlQueue:
 
             # Check same-domain restriction
             if config.get('same_domain', True) and self.seed_domains:
-                if domain not in self.seed_domains:
+                domain = get_domain(url)
+                # Check both full domain and root domain
+                is_allowed = domain in self.seed_domains
+
+                # Also check root domain (e.g., themealdb.com for www.themealdb.com)
+                if not is_allowed:
+                    parts = domain.split('.')
+                    if len(parts) >= 2:
+                        root_domain = '.'.join(parts[-2:])
+                        is_allowed = root_domain in self.seed_domains
+
+                if not is_allowed:
                     return False
 
             # Calculate priority
@@ -434,11 +531,413 @@ class DomainRateLimiter:
 
 
 # ================================================================
+# INTELLIGENT CONTENT QUALITY SCORER (For NTTuner)
+# ================================================================
+class NTTunerContentScorer:
+    """
+    Intelligent content quality assessment for training data.
+    Scores content based on information density, structure, and educational value.
+    """
+
+    def __init__(self):
+        # High-value content indicators
+        self.high_value_patterns = {
+            'educational': [
+                r'\b(how to|tutorial|guide|learn|explanation|introduction to|basics of)\b',
+                r'\b(step \d+|first|second|third|finally|conclusion)\b',
+                r'\b(example|for instance|such as|including|specifically)\b',
+            ],
+            'informational': [
+                r'\b(definition|meaning|refers to|is defined as|consists of)\b',
+                r'\b(overview|summary|description|details|information about)\b',
+                r'\b(history|background|context|origin|development)\b',
+            ],
+            'technical': [
+                r'\b(algorithm|method|technique|approach|process|procedure)\b',
+                r'\b(function|variable|parameter|argument|return|output)\b',
+                r'\b(implementation|usage|syntax|structure|format)\b',
+            ],
+            'analytical': [
+                r'\b(analysis|comparison|evaluation|assessment|review)\b',
+                r'\b(advantage|disadvantage|benefit|drawback|limitation)\b',
+                r'\b(pros and cons|strengths and weaknesses)\b',
+            ]
+        }
+
+        # Low-value content indicators
+        self.low_value_patterns = {
+            'navigation': [
+                r'\b(home|about us|contact|privacy policy|terms of service)\b',
+                r'\b(sitemap|search|menu|navigation|subscribe|newsletter)\b',
+                r'\b(follow us|social media|share|tweet|facebook)\b',
+            ],
+            'commercial': [
+                r'\b(buy now|add to cart|checkout|purchase|sale|discount)\b',
+                r'\b(price|\$\d+|order now|free shipping|limited offer)\b',
+                r'\b(advertisement|sponsored|promoted|affiliate)\b',
+            ],
+            'generic': [
+                r'\b(click here|read more|learn more|see more|view all)\b',
+                r'\b(loading|please wait|error|404|page not found)\b',
+                r'\b(cookies|gdpr|accept|decline|agree)\b',
+            ],
+            'placeholder': [
+                r'\b(lorem ipsum|placeholder|coming soon|under construction)\b',
+                r'\b(test|debug|temp|temporary|example\.com)\b',
+            ]
+        }
+
+        # Content structure indicators
+        self.structure_patterns = {
+            'lists': r'(?:\n\s*[-•*]\s+.+){3,}',  # Bullet points
+            'numbered': r'(?:\n\s*\d+[.)]\s+.+){3,}',  # Numbered lists
+            'headings': r'(?:^|\n)#+\s+.+|(?:^|\n)[A-Z][^.!?]*:',  # Headers
+            'code': r'```[\s\S]*?```|`[^`]+`',  # Code blocks
+            'quotes': r'(?:^|\n)\s*>.*',  # Blockquotes
+        }
+
+    def score_content(self, text: str, url: str) -> Dict[str, float]:
+        """
+        Score content across multiple dimensions.
+        Returns dict with scores and overall quality rating.
+        """
+        text_lower = text.lower()
+
+        scores = {
+            'length': self._score_length(text),
+            'information_density': self._score_information_density(text, text_lower),
+            'structure': self._score_structure(text),
+            'educational_value': self._score_educational_value(text_lower),
+            'noise_level': self._score_noise_level(text_lower),
+            'url_quality': self._score_url_quality(url),
+        }
+
+        # Calculate weighted overall score (0-100)
+        weights = {
+            'length': 0.10,
+            'information_density': 0.30,
+            'structure': 0.15,
+            'educational_value': 0.25,
+            'noise_level': 0.15,
+            'url_quality': 0.05,
+        }
+
+        overall = sum(scores[k] * weights[k] for k in weights)
+        scores['overall'] = overall
+
+        # Add quality rating
+        if overall >= 80:
+            scores['rating'] = 'excellent'
+        elif overall >= 65:
+            scores['rating'] = 'good'
+        elif overall >= 50:
+            scores['rating'] = 'fair'
+        else:
+            scores['rating'] = 'poor'
+
+        return scores
+
+    def _score_length(self, text: str) -> float:
+        """Score based on content length - more lenient for dense content"""
+        length = len(text)
+
+        # Very short content can still be valuable (tips, quick recipes)
+        if length < 100:
+            return 0
+        elif length < 200:
+            # Check if it's actually useful despite being short
+            # Count instructional indicators
+            useful_patterns = ['ingredients?:', 'instructions?:', 'steps?:', 'how to',
+                               'tip:', 'note:', '\d+\.', 'first', 'then', 'finally']
+            useful_count = sum(1 for p in useful_patterns if re.search(p, text.lower()))
+
+            if useful_count >= 2:  # Has at least 2 instructional indicators
+                return 70  # Good score for short instructional content
+            return 20
+        elif length < 300:
+            # 200-300: Acceptable for quick tips/recipes
+            return 55
+        elif length < 500:
+            return 65
+        elif length < 800:
+            return 75
+        elif 800 <= length <= 5000:
+            return 100  # Sweet spot
+        elif 5000 < length <= 10000:
+            return 85
+        elif 10000 < length <= 20000:
+            return 70
+        else:
+            return 50  # Very long content might be diluted
+
+    def _score_information_density(self, text: str, text_lower: str) -> float:
+        """Score based on information-rich content patterns"""
+        score = 50  # Base score
+
+        # Count sentences
+        sentences = len(re.findall(r'[.!?]+', text))
+        if sentences == 0:
+            return 0
+
+        # Words per sentence (ideal: 15-25)
+        words = len(text.split())
+        wps = words / sentences if sentences > 0 else 0
+
+        if 15 <= wps <= 25:
+            score += 20
+        elif 10 <= wps < 15 or 25 < wps <= 35:
+            score += 10
+        elif wps < 5 or wps > 50:
+            score -= 20
+
+        # Check for high-value patterns
+        high_value_count = 0
+        for category, patterns in self.high_value_patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, text_lower):
+                    high_value_count += 1
+
+        score += min(30, high_value_count * 3)
+
+        # Penalize excessive repetition
+        unique_words = len(set(text_lower.split()))
+        if words > 0:
+            uniqueness = unique_words / words
+            if uniqueness < 0.3:
+                score -= 20
+
+        return max(0, min(100, score))
+
+    def _score_structure(self, text: str) -> float:
+        """Score based on document structure (lists, headers, formatting)"""
+        score = 40  # Base score
+
+        for structure_type, pattern in self.structure_patterns.items():
+            if re.search(pattern, text):
+                score += 12
+
+        # Check for paragraph structure
+        paragraphs = text.split('\n\n')
+        if 2 <= len(paragraphs) <= 20:
+            score += 15
+        elif len(paragraphs) > 20:
+            score += 5
+
+        return min(100, score)
+
+    def _score_educational_value(self, text_lower: str) -> float:
+        """Score based on educational/tutorial content"""
+        score = 30  # Base score
+
+        # Check each category
+        for category, patterns in self.high_value_patterns.items():
+            matches = sum(1 for p in patterns if re.search(p, text_lower))
+            if matches > 0:
+                score += 15
+
+        # Bonus for multiple categories
+        categories_found = sum(
+            1 for patterns in self.high_value_patterns.values()
+            if any(re.search(p, text_lower) for p in patterns)
+        )
+
+        if categories_found >= 3:
+            score += 20
+        elif categories_found >= 2:
+            score += 10
+
+        return min(100, score)
+
+    def _score_noise_level(self, text_lower: str) -> float:
+        """Score based on noise/unwanted content (higher score = less noise)"""
+        score = 100  # Start at 100, deduct for noise
+
+        for category, patterns in self.low_value_patterns.items():
+            matches = sum(1 for p in patterns if re.search(p, text_lower))
+            score -= matches * 8  # Penalize each noise pattern match
+
+        return max(0, score)
+
+    def _score_url_quality(self, url: str) -> float:
+        """Score URL structure for content quality indicators"""
+        url_lower = url.lower()
+        score = 50
+
+        # VERY BAD URL patterns (instant low score)
+        very_bad_patterns = [
+            '/api', '/api.php', '.css', '.js', '.json', '.xml',
+            '/feed', '/rss', '/wp-json/', '/graphql',
+            '/css/', '/js/', '/images/', '/icons/', '/static/', '/assets/',
+            '.jpg', '.jpeg', '.png', '.gif', '.svg', '.pdf',
+            '/privacy', '/terms', '/about', '/contact', '/faq',
+            '/browse/letter', '/browse/name', '/browse/category',
+        ]
+
+        for pattern in very_bad_patterns:
+            if pattern in url_lower:
+                return 0  # Instant fail
+
+        # Good URL indicators
+        good_patterns = [
+            '/blog/', '/article/', '/post/', '/tutorial/', '/guide/',
+            '/docs/', '/documentation/', '/learn/', '/wiki/', '/news/',
+            '/recipe/', '/meal/', '/ingredient/', '/category/',
+            '/technique/', '/method/', '/how-to/', '/tips/',
+        ]
+
+        for pattern in good_patterns:
+            if pattern in url_lower:
+                score += 30
+                break
+
+        # Bad URL indicators
+        bad_patterns = [
+            '/tag/', '/author/', '/page/', '/search',
+            '/login', '/signup', '/register', '/cart', '/checkout',
+            '?page=', '?sort=', '?filter=', '&ref=', '&utm_',
+            '/browse/area/', '/browse/letter/',  # Browse pages
+        ]
+
+        for pattern in bad_patterns:
+            if pattern in url_lower:
+                score -= 25
+                break
+
+        # Penalize very long/complex URLs
+        if len(url) > 150 or url.count('?') > 1:
+            score -= 15
+
+        # Penalize URLs with too many path segments
+        path_segments = url.count('/')
+        if path_segments > 8:
+            score -= 10
+
+        return max(0, min(100, score))
+
+    def should_accept(self, scores: Dict[str, float], threshold: float = 50.0) -> bool:
+        """Determine if content should be accepted based on overall score"""
+        return scores['overall'] >= threshold
+
+    def get_rejection_reason(self, scores: Dict[str, float]) -> str:
+        """Get human-readable reason for rejection"""
+        if scores['overall'] >= 50:
+            return None
+
+        # Find weakest dimension
+        dimensions = ['length', 'information_density', 'structure',
+                      'educational_value', 'noise_level', 'url_quality']
+        weakest = min(dimensions, key=lambda d: scores[d])
+
+        reasons = {
+            'length': 'content too short or too long',
+            'information_density': 'low information density',
+            'structure': 'poor structure/formatting',
+            'educational_value': 'lacks educational value',
+            'noise_level': 'too much noise/irrelevant content',
+            'url_quality': 'URL indicates low-quality page'
+        }
+
+        return reasons.get(weakest, 'low overall quality')
+
+
+# ================================================================
+# SUBDOMAIN DISCOVERY ENGINE
+# ================================================================
+class SubdomainDiscovery:
+    """Intelligent subdomain enumeration and validation"""
+
+    def __init__(self):
+        self.discovered = set()
+        self.verified = set()
+        self.failed = set()
+        self.lock = threading.Lock()
+
+    def extract_root_domain(self, url: str) -> str:
+        """Get root domain from URL"""
+        try:
+            netloc = urllib.parse.urlparse(url).netloc.lower()
+            # Remove port if present
+            netloc = netloc.split(':')[0]
+            parts = netloc.split('.')
+            if len(parts) >= 2:
+                return '.'.join(parts[-2:])
+            return netloc
+        except:
+            return ""
+
+    def generate_candidates(self, domain: str) -> List[str]:
+        """Generate subdomain candidates"""
+        candidates = []
+        for sub in COMMON_SUBDOMAINS:
+            candidates.append(f"https://{sub}.{domain}")
+        return candidates
+
+    def extract_from_html(self, html: str, base_domain: str) -> Set[str]:
+        """Extract subdomains from HTML content"""
+        subdomains = set()
+        # Find all URLs in the HTML
+        urls = re.findall(r'https?://([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', html)
+        for url in urls:
+            if base_domain in url.lower():
+                # Reconstruct full URL
+                subdomains.add(f"https://{url}")
+        return subdomains
+
+    def verify_subdomain(self, url: str, timeout: float = 5.0) -> bool:
+        """Quick check if subdomain exists"""
+        with self.lock:
+            if url in self.verified:
+                return True
+            if url in self.failed:
+                return False
+
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': random.choice(USER_AGENTS)})
+            context = ssl._create_unverified_context()
+            with urllib.request.urlopen(req, timeout=timeout, context=context) as response:
+                with self.lock:
+                    self.verified.add(url)
+                return True
+        except:
+            with self.lock:
+                self.failed.add(url)
+            return False
+
+    def discover_from_page(self, html: str, base_url: str) -> List[str]:
+        """Discover new subdomains from page content"""
+        root = self.extract_root_domain(base_url)
+        if not root:
+            return []
+
+        found = self.extract_from_html(html, root)
+
+        new_subdomains = []
+        with self.lock:
+            for sub in found:
+                if sub not in self.discovered:
+                    self.discovered.add(sub)
+                    new_subdomains.append(sub)
+
+        return new_subdomains
+
+    def get_stats(self) -> Dict:
+        """Get discovery statistics"""
+        with self.lock:
+            return {
+                "discovered": len(self.discovered),
+                "verified": len(self.verified),
+                "failed": len(self.failed)
+            }
+
+
+# ================================================================
 # GLOBAL STATE
 # ================================================================
 proxy_manager = ProxyManager()
 rate_limiter = DomainRateLimiter()
 crawl_queue = CrawlQueue()
+subdomain_engine = SubdomainDiscovery()
+content_scorer = NTTunerContentScorer()
 
 is_running = False
 stop_requested = False
@@ -454,8 +953,12 @@ stats = {
     "success": 0,
     "failed": 0,
     "skipped": 0,
+    "junk_filtered": 0,
     "total_chars": 0,
-    "speed": 0.0
+    "speed": 0.0,
+    "subdomains_found": 0,
+    "avg_quality": 0.0,
+    "quality_filtered": 0
 }
 
 
@@ -491,8 +994,11 @@ def update_stats_ui():
             dpg.set_value("stat_success", str(stats["success"]))
             dpg.set_value("stat_failed", str(stats["failed"]))
             dpg.set_value("stat_skipped", str(stats["skipped"]))
+            dpg.set_value("stat_junk", str(stats.get("junk_filtered", 0)))
             dpg.set_value("stat_chars", f"{stats['total_chars'] / 1000:.1f}k")
             dpg.set_value("stat_speed", f"{stats['speed']:.1f}/s")
+        if dpg.does_item_exist("stat_quality"):
+            dpg.set_value("stat_quality", f"{stats.get('avg_quality', 0):.0f}%")
     except:
         pass
 
@@ -513,8 +1019,79 @@ def normalize_url(url: str) -> str:
         return url
 
 
-def build_text(system_override: str, user_content: str, template_key: str) -> str:
-    """Build formatted training text"""
+def get_current_content_config():
+    """Get the current content type configuration"""
+    content_type = DEFAULT_CONTENT_TYPE
+
+    try:
+        if dpg.does_item_exist("content_type_combo"):
+            content_type = dpg.get_value("content_type_combo")
+    except:
+        pass
+
+    config = CONTENT_TYPES.get(content_type, CONTENT_TYPES["Custom"]).copy()
+
+    # Override with custom settings if provided
+    try:
+        if dpg.does_item_exist("custom_sections_input"):
+            custom_sections = dpg.get_value("custom_sections_input").strip()
+            if custom_sections:
+                config["detail_sections"] = [s.strip() for s in custom_sections.split(",") if s.strip()]
+
+        if dpg.does_item_exist("custom_prompt_input"):
+            custom_prompt = dpg.get_value("custom_prompt_input").strip()
+            if custom_prompt:
+                config["user_prompt_template"] = custom_prompt
+    except:
+        pass
+
+    return config
+
+
+def on_content_type_change(sender, app_data):
+    """Callback when content type changes"""
+    content_type = app_data
+    config = CONTENT_TYPES[content_type]
+
+    # Update system prompt suggestion
+    if dpg.does_item_exist("system_prompt_input"):
+        current_system = dpg.get_value("system_prompt_input").strip()
+        # Only auto-update if it's empty or matches a known preset
+        if not current_system or current_system in SYSTEM_PROMPTS.values():
+            dpg.set_value("system_prompt_input", config["system_prompt"])
+
+    # Show/hide custom fields
+    is_custom = content_type == "Custom"
+    if dpg.does_item_exist("custom_fields_group"):
+        dpg.configure_item("custom_fields_group", show=is_custom)
+
+    # Update preview
+    if dpg.does_item_exist("prompt_preview_text"):
+        example = config["example_titles"][0] if config["example_titles"] and config["example_titles"][
+            0] else "Example Title"
+        preview = config["user_prompt_template"].format(title=example)
+        dpg.set_value("prompt_preview_text", f"Preview: {preview}")
+
+    log(f"Content type changed to: {content_type}")
+
+
+def format_assistant_response(title, content, sections):
+    """
+    Format the assistant's response with optional sections
+    """
+    response_parts = [title]
+
+    if sections:
+        # Add section markers - in future could use ML to extract actual sections
+        response_parts.append(content)
+    else:
+        response_parts.append(content)
+
+    return "\n".join(response_parts)
+
+
+def build_text(system_override: str, user_content: str, template_key: str, content_type_config: dict = None) -> str:
+    """Build formatted training text using content type configuration"""
     tpl = MODEL_TEMPLATES.get(template_key, MODEL_TEMPLATES[DEFAULT_TEMPLATE_KEY])
     system_text = system_override.strip()
 
@@ -523,11 +1100,71 @@ def build_text(system_override: str, user_content: str, template_key: str) -> st
     if system_text and "system" in tpl:
         text_out += tpl["system"].format(system=system_text)
 
+    # Get content type configuration
+    if content_type_config is None:
+        content_type_config = CONTENT_TYPES[DEFAULT_CONTENT_TYPE]
+
+    # Extract title from content - IMPROVED LOGIC
+    title = "Untitled Content"
+    content_lines = user_content.split('\n')
+
+    if content_lines:
+        # Try to find the first substantial line as title
+        for line in content_lines[:5]:  # Check first 5 lines
+            line = line.strip()
+
+            # Skip empty lines
+            if not line:
+                continue
+
+            # Skip obvious non-title patterns
+            if line.lower().startswith(('recipe api', 'themealdb', 'ingredient api')):
+                continue
+            if line.startswith(('http://', 'https://', 'www.')):
+                continue
+            if len(line) < 3:  # Too short
+                continue
+            if len(line) > 150:  # Too long
+                continue
+
+            # This looks like a potential title
+            title = line
+            break
+
+    # Format user prompt based on content type
+    user_prompt = content_type_config["user_prompt_template"].format(title=title)
+
     if "user" in tpl:
-        text_out += tpl["user"].format(user=user_content.strip())
+        text_out += tpl["user"].format(user=user_prompt)
 
     if "assistant" in tpl:
-        text_out += tpl["assistant"].format(assistant="[Detailed answer based on content]")
+        # Clean up the content before adding
+        cleaned_content = user_content.strip()
+
+        # Remove common noise patterns from the start
+        lines = cleaned_content.split('\n')
+        cleaned_lines = []
+        skip_count = 0
+
+        for i, line in enumerate(lines):
+            line_stripped = line.strip()
+
+            # Skip the first occurrence of site branding
+            if i < 3 and any(x in line_stripped.lower() for x in ['recipe api', 'themealdb', '- free']):
+                skip_count += 1
+                continue
+
+            # Skip repeated title (often happens)
+            if i > 0 and skip_count < 2 and line_stripped == title:
+                skip_count += 1
+                continue
+
+            cleaned_lines.append(line)
+
+        cleaned_content = '\n'.join(cleaned_lines)
+
+        # Format the final response
+        text_out += tpl["assistant"].format(assistant=cleaned_content)
 
     return text_out
 
@@ -537,7 +1174,7 @@ def build_text(system_override: str, user_content: str, template_key: str) -> st
 # ================================================================
 def extract_text_content(html: str, url: str, config: Dict) -> Tuple[str, List[str]]:
     """
-    Simple, reliable content extraction (from working a.py).
+    Intelligent content extraction - extracts ONLY main content, filters noise.
     Returns (clean_text, links)
     """
     # Extract links first (before cleaning)
@@ -545,34 +1182,212 @@ def extract_text_content(html: str, url: str, config: Dict) -> Tuple[str, List[s
     if config.get('crawler_enabled', False):
         found_links = extract_links(html, url)
 
-    # Cleaning - remove problematic tags completely
-    text = re.sub(r"<(script|style|nav|footer|header|iframe|noscript)[^>]*>.*?</\1>", "", html,
-                  flags=re.I | re.S)
+    # Step 1: Remove entire sections that are pure noise
+    noise_sections = [
+        r'<nav[^>]*>.*?</nav>',
+        r'<header[^>]*>.*?</header>',
+        r'<footer[^>]*>.*?</footer>',
+        r'<aside[^>]*>.*?</aside>',
+        r'<script[^>]*>.*?</script>',
+        r'<style[^>]*>.*?</style>',
+        r'<iframe[^>]*>.*?</iframe>',
+        r'<noscript[^>]*>.*?</noscript>',
+        r'<svg[^>]*>.*?</svg>',
+        r'<!--.*?-->',
+    ]
 
-    # Remove code blocks if configured
+    for pattern in noise_sections:
+        html = re.sub(pattern, ' ', html, flags=re.I | re.S)
+
+    # Step 2: Remove common noise patterns
+    noise_patterns = [
+        r'<button[^>]*>.*?</button>',
+        r'<select[^>]*>.*?</select>',
+        r'<input[^>]*>',
+        r'<form[^>]*>.*?</form>',
+    ]
+
+    for pattern in noise_patterns:
+        html = re.sub(pattern, ' ', html, flags=re.I | re.S)
+
+    # Step 3: Try to extract main content area
+    main_content_patterns = [
+        r'<main[^>]*>(.*?)</main>',
+        r'<article[^>]*>(.*?)</article>',
+        r'<div[^>]*class=["\'][^"\']*content[^"\']*["\'][^>]*>(.*?)</div>',
+        r'<div[^>]*id=["\']content["\'][^>]*>(.*?)</div>',
+    ]
+
+    extracted_content = None
+    for pattern in main_content_patterns:
+        matches = re.findall(pattern, html, flags=re.I | re.S)
+        if matches:
+            extracted_content = max(matches, key=len)
+            break
+
+    if extracted_content and len(extracted_content) > 200:
+        html = extracted_content
+
+    # Step 4: Preserve structure before removing tags
+    # Convert headers to text markers
+    html = re.sub(r'<h[1-6][^>]*>(.*?)</h[1-6]>', r'\n\n\1\n', html, flags=re.I)
+
+    # Convert lists to formatted text
+    html = re.sub(r'<li[^>]*>(.*?)</li>', r'\n- \1', html, flags=re.I)
+
+    # Convert paragraphs to double newlines
+    html = re.sub(r'</p>', r'\n\n', html, flags=re.I)
+    html = re.sub(r'<br\s*/?>', r'\n', html, flags=re.I)
+
+    # Step 5: Remove code blocks if configured
     if config.get('clean_code', False):
-        text = re.sub(r"<pre>.*?</pre>", "", text, flags=re.I | re.S)
-        text = re.sub(r"<code>.*?</code>", "", text, flags=re.I | re.S)
+        html = re.sub(r"<pre[^>]*>.*?</pre>", "", html, flags=re.I | re.S)
+        html = re.sub(r"<code[^>]*>.*?</code>", "", html, flags=re.I | re.S)
 
-    # Strip all HTML tags
-    text = re.sub(r"<[^>]+>", " ", text)
+    # Step 6: Strip all remaining HTML tags
+    text = re.sub(r"<[^>]+>", " ", html)
 
-    # Clean whitespace
-    if config.get('clean_whitespace', True):
-        text = re.sub(r"\s{2,}", " ", text).strip()
-    else:
-        text = re.sub(r"\n\s*\n", "\n\n", text).strip()  # Preserve paragraphs
+    # Step 7: Decode HTML entities
+    text = text.replace('&nbsp;', ' ')
+    text = text.replace('&amp;', '&')
+    text = text.replace('&lt;', '<')
+    text = text.replace('&gt;', '>')
+    text = text.replace('&quot;', '"')
+    text = text.replace('&#39;', "'")
+    text = text.replace('&mdash;', '—')
+    text = text.replace('&ndash;', '–')
+
+    # Step 8: Remove common noise text patterns
+    noise_text_patterns = [
+        r'Recipe API - TheMealDB',
+        r'- TheMealDB\.com',
+        r'TheMealDB\.com',
+        r'No Tags',
+        r'Tags:?\s*$',
+        r'Category:?\s*$',
+        r'Skip to (?:main )?content',
+        r'(?:Toggle|Open|Close) (?:navigation|menu)',
+        r'(?:Share|Like|Tweet|Pin) (?:this|on)',
+        r'Subscribe to (?:our )?newsletter',
+        r'Follow us on (?:Facebook|Twitter|Instagram)',
+        r'Copyright \d{4}',
+        r'All rights reserved',
+        r'Terms (?:of Service|and Conditions)',
+        r'Privacy Policy',
+        r'Cookie (?:Policy|Settings)',
+        r'Click here to',
+        r'Loading\.\.\.',
+        r'Please enable JavaScript',
+        r'Browse (?:all |More)?[A-Z\s/]*',
+        r'Browse (?:By Name|Country|Category)',
+        r'Latest Meals?',
+        r'Popular Ingredients?',
+        r'Random (?:Meals?|Ingredients?)',
+        r'Welcome to \w+',
+        r'\d+ premium supporters?',
+    ]
+
+    for pattern in noise_text_patterns:
+        text = re.sub(pattern, '', text, flags=re.I)
+
+    # Step 9: Better organization - add section headers if missing
+    lines = text.split('\n')
+    organized_lines = []
+    in_ingredients = False
+    in_instructions = False
+
+    for i, line in enumerate(lines):
+        line = line.strip()
+        if not line:
+            continue
+
+        # Detect ingredient sections (lines with measurements)
+        is_ingredient = bool(
+            re.search(r'\d+\s*(cup|tsp|tbsp|oz|lb|g|kg|ml|l|medium|large|small|pinch|dash)', line, re.I))
+
+        # Detect instruction sections (lines starting with verbs or numbers)
+        is_instruction = bool(
+            re.search(r'^(\d+[\.)]\s+|Mix|Add|Stir|Bake|Cook|Heat|Pour|Blend|Combine|Place|Put)', line, re.I))
+
+        # Add section headers
+        if is_ingredient and not in_ingredients and not in_instructions:
+            if organized_lines and organized_lines[-1] != '':
+                organized_lines.append('')
+            organized_lines.append('Ingredients:')
+            in_ingredients = True
+            in_instructions = False
+        elif is_instruction and not in_instructions:
+            if organized_lines and organized_lines[-1] != '':
+                organized_lines.append('')
+            organized_lines.append('Instructions:')
+            in_instructions = True
+            in_ingredients = False
+
+        # Format ingredient lines
+        if in_ingredients and is_ingredient:
+            if not line.startswith('-'):
+                line = '- ' + line
+
+        # Format instruction lines
+        if in_instructions and is_instruction:
+            # Make sure numbered instructions are formatted consistently
+            line = re.sub(r'^(\d+)\.?\s*', r'\1. ', line)
+
+        organized_lines.append(line)
+
+    text = '\n'.join(organized_lines)
+
+    # Step 9: Clean whitespace
+    text = re.sub(r' {2,}', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    text = '\n'.join(lines)
+
+    # Step 10: Remove very short lines that are likely navigation
+    lines = text.split('\n')
+    filtered_lines = []
+    for line in lines:
+        # Skip lines that are too short or look like navigation
+        if len(line) < 3:
+            continue
+        # Skip single-word lines unless they're part of a list
+        words = line.split()
+        if len(words) == 1 and not line.startswith('-'):
+            continue
+        filtered_lines.append(line)
+
+    text = '\n'.join(filtered_lines)
 
     return text[:200000], found_links
 
 
 def extract_links(html: str, base_url: str) -> List[str]:
-    """Simple, reliable link extraction (from working a.py)"""
+    """Extract all links from HTML, converting relative URLs to absolute"""
     links = set()
-    matches = re.findall(r'href=["\'](http[s]?://[^"\']+)["\']', html)
-    for link in matches:
-        if link != base_url:
-            links.add(link)
+
+    # Extract absolute URLs (http:// or https://)
+    absolute_pattern = r'href=["\'](https?://[^"\']+)["\']'
+    for match in re.findall(absolute_pattern, html, re.IGNORECASE):
+        if match != base_url:
+            links.add(match)
+
+    # Extract relative URLs (starting with /)
+    relative_pattern = r'href=["\'](/[^"\']*?)["\']'
+    for match in re.findall(relative_pattern, html, re.IGNORECASE):
+        # Convert relative to absolute
+        absolute_url = urllib.parse.urljoin(base_url, match)
+        if absolute_url != base_url:
+            links.add(absolute_url)
+
+    # Extract protocol-relative URLs (//example.com/path)
+    protocol_relative_pattern = r'href=["\'](//[^"\']+)["\']'
+    for match in re.findall(protocol_relative_pattern, html, re.IGNORECASE):
+        # Add protocol from base_url
+        parsed_base = urllib.parse.urlparse(base_url)
+        absolute_url = f"{parsed_base.scheme}:{match}"
+        if absolute_url != base_url:
+            links.add(absolute_url)
+
     return list(links)
 
 
@@ -627,6 +1442,12 @@ def fetch_url(url: str, config: Dict) -> Tuple[Optional[str], Optional[str], Lis
             if proxy_addr:
                 proxy_manager.report_success(proxy_addr, time.time() - start_time)
 
+            # Discover subdomains if enabled
+            if config.get('discover_subdomains', False):
+                new_subdomains = subdomain_engine.discover_from_page(raw_data, url)
+                if new_subdomains:
+                    log(f"  [SUBDOMAIN] Discovered {len(new_subdomains)} subdomains from page", [150, 200, 255])
+
             # Extract meaningful text content
             clean_text, links = extract_text_content(raw_data, url, config)
 
@@ -665,12 +1486,118 @@ def process_url(url: str, depth: int, config: Dict) -> Tuple[str, bool, int, Lis
     return (url, result.get('success', False), result.get('chars', 0), result.get('links', []))
 
 
+def validate_content_quality(content: str, url: str) -> Tuple[bool, str]:
+    """
+    Enhanced validation to detect and reject junk pages, list pages, and non-recipe content.
+    Returns (is_valid, reason_if_invalid)
+    """
+    content_lower = content.lower()
+
+    # Check 1: Detect FAQ/About/Privacy pages by keywords
+    junk_keywords = [
+        'privacy policy', 'terms of service', 'terms of use', 'cookie policy',
+        'about us', 'contact us', 'gdpr', 'data protection', 'email protected',
+        'all rights reserved', 'copyright', '© 20', 'terms and conditions',
+        'patreon supporter', 'api key', 'how do i add', 'sign up on patreon'
+    ]
+
+    junk_count = sum(1 for kw in junk_keywords if kw in content_lower)
+    if junk_count >= 2:
+        return False, "Junk page (FAQ/About/Privacy)"
+
+    # Check 2: Detect list/index pages (lots of recipe names, no instructions)
+    lines = content.split('\n')
+    non_empty_lines = [l.strip() for l in lines if l.strip()]
+
+    if len(non_empty_lines) > 15:
+        # Count lines that look like recipe titles (short, capitalized)
+        title_like_lines = 0
+        for line in non_empty_lines[:30]:  # Check first 30 lines
+            # Recipe title pattern: 15-60 chars, starts with capital, no numbers at start
+            if (15 < len(line) < 60 and
+                    line[0].isupper() and
+                    not line[0].isdigit() and
+                    line.count('\n') == 0):
+                title_like_lines += 1
+
+        # If >60% of lines look like titles, it's probably a list page
+        if title_like_lines > len(non_empty_lines[:30]) * 0.6:
+            return False, "List/index page (many recipe names)"
+
+    # Check 3: Detect recipe content indicators
+    recipe_indicators = {
+        'ingredients': ['ingredient', 'cup', 'tablespoon', 'teaspoon', 'tsp', 'tbsp',
+                        'oz', 'lb', 'gram', 'kg', 'ml', 'pinch', 'dash', 'clove'],
+        'instructions': ['cook', 'bake', 'mix', 'stir', 'heat', 'add', 'pour', 'chop',
+                         'dice', 'slice', 'preheat', 'simmer', 'boil', 'fry', 'roast',
+                         'step 1', 'step 2', 'minutes', 'until'],
+    }
+
+    ingredient_count = sum(1 for word in recipe_indicators['ingredients'] if word in content_lower)
+    instruction_count = sum(1 for word in recipe_indicators['instructions'] if word in content_lower)
+
+    # Real recipes have both ingredients and instructions
+    if ingredient_count < 3 and instruction_count < 5:
+        return False, "Missing recipe indicators (no ingredients/instructions)"
+
+    # Check 4: Detect ingredient/category description pages
+    if 'ingredient api' in content_lower or 'category api' in content_lower:
+        return False, "API/ingredient description page"
+
+    # Check 5: Number density check (recipes have measurements/times)
+    # Count numbers in content
+    number_count = len(re.findall(r'\d+', content))
+    words = len(content.split())
+
+    if words > 100:  # Only check if substantial content
+        number_density = number_count / words
+        # Real recipes have 5-15% numbers (measurements, temps, times)
+        if number_density < 0.02:  # Less than 2% numbers = probably list page
+            return False, "Too few numbers (likely not a recipe)"
+
+    # Check 6: Sentence structure (lists have many short lines)
+    avg_line_length = sum(len(l) for l in non_empty_lines) / max(len(non_empty_lines), 1)
+    if avg_line_length < 25 and len(non_empty_lines) > 20:
+        return False, "Too many short lines (likely list page)"
+
+    return True, ""
+
+
 def process_url_v2(url: str, depth: int, config: Dict) -> Dict:
     """
     Process a single URL. Returns dict with results.
     """
     if stop_requested or force_stop:
         return {'success': False, 'error': None, 'chars': 0, 'links': [], 'filtered': True}
+
+    # URL pattern filtering - skip non-content URLs
+    skip_url_patterns = [
+        r'/api[/\.]',  # API endpoints
+        r'/api\.php',  # API files
+        r'\.css',  # CSS files
+        r'\.js',  # JavaScript files
+        r'\.json',  # JSON files
+        r'\.xml',  # XML files
+        r'\.jpg', r'\.jpeg', r'\.png', r'\.gif', r'\.svg', r'\.webp',  # Images
+        r'\.pdf', r'\.zip', r'\.tar', r'\.gz',  # Documents/Archives
+        r'/feed', r'/rss',  # RSS feeds
+        r'/wp-json/',  # WordPress API
+        r'/graphql',  # GraphQL endpoints
+        r'\?format=json',  # JSON format queries
+        r'/css/',  # CSS directories
+        r'/js/',  # JS directories
+        r'/images/',  # Image directories
+        r'/icons/',  # Icon directories
+        r'/fonts/',  # Font directories
+        r'/static/',  # Static assets
+        r'/assets/',  # Asset directories
+    ]
+
+    url_lower = url.lower()
+    for pattern in skip_url_patterns:
+        if re.search(pattern, url_lower):
+            log(f"  [SKIP-URL] Non-content URL: {url[:60]}...", [150, 150, 150])
+            return {'success': False, 'error': None, 'chars': 0, 'links': [], 'filtered': True}
 
     # Domain blacklist
     domain_bl = config.get('domain_blacklist', [])
@@ -687,33 +1614,91 @@ def process_url_v2(url: str, depth: int, config: Dict) -> Dict:
     if not content:
         return {'success': False, 'error': None, 'chars': 0, 'links': [], 'filtered': True}
 
-    # Apply filters
+    # SMART CONTENT VALIDATION - Skip junk pages and lists
+    is_valid, invalid_reason = validate_content_quality(content, url)
+    if not is_valid:
+        log(f"  [SKIP-JUNK] {invalid_reason}: {url[:50]}...", [200, 150, 100])
+        stats['junk_filtered'] += 1
+        return {'success': False, 'error': None, 'chars': 0, 'links': links, 'filtered': True}
+
+    # Log links found
+    if config.get('crawler_enabled', False) and links:
+        log(f"  [LINKS] Found {len(links)} links on page", [120, 180, 220])
+
+    # Apply basic filters first
     content_len = len(content)
     text_lower = content.lower()
+    quality_scores = None  # Initialize to None
 
-    min_chars = config.get('min_chars', 300)
+    min_chars = config.get('min_chars', 150)
     max_chars = config.get('max_chars', 50000)
+    allow_short_quality = config.get('allow_short_quality', False)
+    short_min_chars = config.get('short_min_chars', 100)
+    ignore_quality_short = config.get('ignore_quality_short', False)
+
+    # Length check with bypass options
+    if content_len < min_chars:
+        # Check if content meets the absolute minimum for short content
+        if content_len < short_min_chars:
+            log(f"  [!] Too short ({content_len}, min={short_min_chars}): {url[:40]}...", [150, 150, 100])
+            return {'success': False, 'error': None, 'chars': 0, 'links': links, 'filtered': True}
+
+        # Content is between short_min_chars and min_chars
+        # Apply short content rules
+        if ignore_quality_short:
+            # Accept ALL short content without quality check
+            log(f"  [SHORT-ACCEPT] Accepted short content ({content_len} chars, quality ignored): {url[:40]}...",
+                [100, 255, 100])
+            quality_scores = content_scorer.score_content(content, url)  # Calculate for stats only
+        elif allow_short_quality:
+            # Accept short content only if high quality
+            quality_scores = content_scorer.score_content(content, url)
+            if quality_scores['overall'] >= 70:
+                log(f"  [SHORT-OK] Short but high quality ({content_len} chars, Q{quality_scores['overall']:.0f}): {url[:40]}...",
+                    [100, 200, 255])
+            else:
+                log(f"  [!] Too short ({content_len} chars, Q{quality_scores['overall']:.0f}): {url[:40]}...",
+                    [150, 150, 100])
+                return {'success': False, 'error': None, 'chars': 0, 'links': links, 'filtered': True}
+        else:
+            # Reject short content (neither option enabled)
+            log(f"  [!] Too short ({content_len} chars, min={min_chars}): {url[:40]}...", [150, 150, 100])
+            return {'success': False, 'error': None, 'chars': 0, 'links': links, 'filtered': True}
+
+    if content_len > max_chars:
+        content = content[:max_chars]
+        content_len = max_chars
+
+    # Apply keyword filters
     kw_in = config.get('keywords_in', [])
     kw_out = config.get('keywords_out', [])
 
-    if content_len < min_chars:
-        log(f"  [!] Too short ({content_len}): {url[:40]}...", [150, 150, 100])
-        return {'success': False, 'error': None, 'chars': 0, 'links': links, 'filtered': True}
-
-    if content_len > max_chars:
-        log(f"  [!] Too long ({content_len}): {url[:40]}...", [150, 150, 100])
-        return {'success': False, 'error': None, 'chars': 0, 'links': links, 'filtered': True}
-
     if kw_in and not any(k in text_lower for k in kw_in):
+        log(f"  [!] Missing required keywords: {url[:40]}...", [150, 150, 100])
         return {'success': False, 'error': None, 'chars': 0, 'links': links, 'filtered': True}
 
     if kw_out and any(k in text_lower for k in kw_out):
+        log(f"  [!] Contains excluded keywords: {url[:40]}...", [150, 150, 100])
         return {'success': False, 'error': None, 'chars': 0, 'links': links, 'filtered': True}
+
+    # Quality scoring (if enabled and not already scored from short content check)
+    if not quality_scores and config.get('use_quality_filter', False):
+        quality_scores = content_scorer.score_content(content, url)
+        quality_threshold = config.get('quality_threshold', 50.0)
+
+        if not content_scorer.should_accept(quality_scores, quality_threshold):
+            reason = content_scorer.get_rejection_reason(quality_scores)
+            log(f"  [SKIP-Q] Quality: {quality_scores['overall']:.0f}/100 ({reason}): {url[:40]}...",
+                [200, 150, 100])
+            stats['quality_filtered'] += 1
+            return {'success': False, 'error': None, 'chars': 0, 'links': links,
+                    'filtered': True, 'quality': quality_scores['overall']}
 
     # Build training text
     system_prompt = config.get('system_prompt', '')
     template_key = config.get('template', DEFAULT_TEMPLATE_KEY)
-    final_text = build_text(system_prompt, content, template_key)
+    content_type_cfg = config.get('content_type_config', CONTENT_TYPES[DEFAULT_CONTENT_TYPE])
+    final_text = build_text(system_prompt, content, template_key, content_type_cfg)
 
     # Write to file (thread-safe)
     with write_lock:
@@ -724,10 +1709,24 @@ def process_url_v2(url: str, depth: int, config: Dict) -> Dict:
             log(f"  [!] Write error: {e}", [255, 100, 100])
             return {'success': False, 'error': str(e), 'chars': 0, 'links': [], 'filtered': False}
 
-    log(f"  [+] [D{depth}] {url[:50]}... ({content_len} chars)", [0, 255, 150])
+    # Log success with quality score
+    if quality_scores:
+        quality_str = f"Q{quality_scores['overall']:.0f}"
+        rating_colors = {
+            'excellent': [50, 255, 50],
+            'good': [100, 255, 100],
+            'fair': [200, 200, 100],
+            'poor': [255, 150, 50]
+        }
+        color = rating_colors.get(quality_scores['rating'], [100, 255, 150])
+        log(f"  [+] [D{depth}] [{quality_str}] {url[:50]}... ({content_len} chars)", color)
+    else:
+        log(f"  [+] [D{depth}] {url[:50]}... ({content_len} chars)", [0, 255, 150])
 
-    # Return links for crawling (even if we succeed, pass links for discovery)
-    return {'success': True, 'error': None, 'chars': content_len, 'links': links, 'filtered': False}
+    # Return quality score for stats
+    quality_val = quality_scores['overall'] if quality_scores else 0
+    return {'success': True, 'error': None, 'chars': content_len, 'links': links,
+            'filtered': False, 'quality': quality_val}
 
 
 # ================================================================
@@ -763,6 +1762,9 @@ def scrape_worker():
         "keywords_in": [k.strip().lower() for k in dpg.get_value("inp_kw_in").split(",") if k.strip()],
         "keywords_out": [k.strip().lower() for k in dpg.get_value("inp_kw_out").split(",") if k.strip()],
         "domain_blacklist": [d.strip().lower() for d in dpg.get_value("inp_domain_bl").split(",") if d.strip()],
+        "allow_short_quality": dpg.get_value("chk_allow_short_quality"),
+        "short_min_chars": dpg.get_value("inp_short_min_chars"),
+        "ignore_quality_short": dpg.get_value("chk_ignore_quality_short"),
         "crawler_enabled": dpg.get_value("chk_crawler"),
         "max_depth": dpg.get_value("inp_max_depth"),
         "links_per_page": dpg.get_value("inp_links_per_page"),
@@ -771,6 +1773,10 @@ def scrape_worker():
         "prioritize_content": dpg.get_value("chk_prioritize_content"),
         "clean_code": dpg.get_value("chk_clean_code"),
         "clean_whitespace": dpg.get_value("chk_clean_whitespace"),
+        "discover_subdomains": dpg.get_value("chk_subdomain_discovery"),
+        "use_quality_filter": dpg.get_value("chk_quality_filter"),
+        "quality_threshold": dpg.get_value("inp_quality_threshold"),
+        "content_type_config": get_current_content_config(),  # Add content type config
     }
 
     # Set rate limiter
@@ -782,13 +1788,60 @@ def scrape_worker():
 
     # Initialize crawl queue with seed domains
     crawl_queue.set_seed_domains(initial_urls)
+
+    # Subdomain Discovery Phase
+    if config.get('discover_subdomains', False):
+        log("[*] Subdomain Discovery Enabled - Scanning...", [150, 200, 255])
+
+        all_discovered_subdomains = []
+        for seed_url in initial_urls:
+            root_domain = subdomain_engine.extract_root_domain(seed_url)
+            if not root_domain:
+                continue
+
+            log(f"  Scanning {root_domain} for subdomains...", [120, 180, 220])
+            candidates = subdomain_engine.generate_candidates(root_domain)
+
+            # Verify subdomains (in parallel for speed)
+            verified_count = 0
+            with ThreadPoolExecutor(max_workers=10) as verifier:
+                verification_futures = {verifier.submit(subdomain_engine.verify_subdomain, candidate): candidate
+                                        for candidate in candidates}
+
+                for future in as_completed(verification_futures):
+                    candidate = verification_futures[future]
+                    try:
+                        if future.result():
+                            all_discovered_subdomains.append(candidate)
+                            verified_count += 1
+                            stats['subdomains_found'] += 1
+                            log(f"    [+] Found: {candidate}", [100, 255, 150])
+                    except:
+                        pass
+
+            log(f"  [OK] Discovered {verified_count} subdomains for {root_domain}", [100, 255, 100])
+
+        # Add verified subdomains to crawl queue
+        for subdomain in all_discovered_subdomains:
+            crawl_queue.push(subdomain, 0, config)
+
+        if all_discovered_subdomains:
+            log(f"[SUBDOMAIN] Total: {len(all_discovered_subdomains)} subdomains added to queue", [100, 255, 200])
+        else:
+            log("  No additional subdomains found", [150, 150, 160])
+
+    # Add seed URLs to queue
     for url in initial_urls:
         crawl_queue.push(url, 0, config)
 
     log(f"Engine Online. Seeds: {len(initial_urls)}, Workers: {num_workers}", [100, 200, 255])
+    log(f"Seed domains tracked: {sorted(crawl_queue.seed_domains)}", [120, 180, 220])
     if config['crawler_enabled']:
-        log(f"Crawler: Depth={config['max_depth']}, Links/Page={config['links_per_page']}, PerDomain={config['max_per_domain']}", [100, 200, 255])
+        log(f"Crawler: Depth={config['max_depth']}, Links/Page={config['links_per_page']}, PerDomain={config['max_per_domain']}",
+            [100, 200, 255])
         log(f"         SameDomain={config['same_domain']}, Prioritize={config['prioritize_content']}", [100, 200, 255])
+    else:
+        log(f"[WARNING] Crawler is DISABLED - will only process seed URLs!", [255, 200, 100])
 
     start_time = time.time()
     processed_count = 0
@@ -826,16 +1879,24 @@ def scrape_worker():
                     new_links = result.get('links', [])
                     error = result.get('error', None)
                     filtered = result.get('filtered', False)
+                    quality = result.get('quality', 0)
 
                     if success:
                         stats["success"] += 1
                         stats["total_chars"] += char_count
 
+                        # Track quality
+                        if quality > 0:
+                            current_avg = stats.get("avg_quality", 0)
+                            count = stats["success"]
+                            stats["avg_quality"] = ((current_avg * (count - 1)) + quality) / count
+
                         # Add discovered links to crawl queue
-                        if config['crawler_enabled'] and new_links and depth < config['max_depth']:
+                        if config['crawler_enabled'] and new_links and (depth + 1) < config['max_depth']:
                             added = crawl_queue.push_many(new_links, depth + 1, config)
                             if added > 0:
-                                log(f"    [>] +{added} links queued (depth {depth+1})", [100, 180, 255])
+                                log(f"    [>] +{added} links queued (depth {depth + 1}, max={config['max_depth']})",
+                                    [100, 180, 255])
                     else:
                         if error:
                             stats["failed"] += 1
@@ -873,11 +1934,36 @@ def scrape_worker():
 
             time.sleep(0.05)
 
+            # Force stop check - cancel all pending futures
+            if force_stop:
+                log("[FORCE STOP] Cancelling remaining tasks...", [255, 100, 100])
+                for future in list(futures.keys()):
+                    future.cancel()
+                break
+
     # Finish
     elapsed = time.time() - start_time
     queue_stats = crawl_queue.get_stats()
-    log(f"Engine Offline. Success: {stats['success']}, Failed: {stats['failed']}, Time: {elapsed:.1f}s", [0, 255, 200])
+    subdomain_stats = subdomain_engine.get_stats()
+
+    if force_stop:
+        log(f"Engine FORCE STOPPED. Processed: {processed_count}, Success: {stats['success']}, Time: {elapsed:.1f}s",
+            [255, 100, 100])
+    else:
+        log(f"Engine Offline. Success: {stats['success']}, Failed: {stats['failed']}, Time: {elapsed:.1f}s",
+            [0, 255, 200])
+
     log(f"Crawl Summary: Discovered {queue_stats['seen']} URLs across {queue_stats['domains']} domains", [0, 180, 255])
+
+    if stats['subdomains_found'] > 0:
+        log(f"Subdomain Discovery: Found {stats['subdomains_found']} subdomains ({subdomain_stats['verified']} verified, {subdomain_stats['failed']} unreachable)",
+            [150, 200, 255])
+
+    if config.get('use_quality_filter', False):
+        avg_quality = stats.get('avg_quality', 0)
+        quality_filtered = stats.get('quality_filtered', 0)
+        log(f"Quality Stats: Average {avg_quality:.1f}/100 | Filtered {quality_filtered} low-quality pages",
+            [255, 200, 50])
 
     if dpg.get_value("chk_sound") and HAS_WINSOUND:
         try:
@@ -904,13 +1990,19 @@ def start_scrape():
 
 
 def handle_stop():
-    global stop_requested, force_stop, last_stop_press
+    global stop_requested, force_stop, last_stop_press, is_running
+
+    if not is_running:
+        return
+
     if time.time() - last_stop_press < 1.5:
+        # Force stop - cancel all futures
         force_stop = True
-        log("FORCE STOP", [255, 50, 50])
+        log("[FORCE STOP] Cancelling all tasks...", [255, 50, 50])
     else:
         stop_requested = True
-        log("Stopping... (double-click to force)", [255, 200, 50])
+        log("[STOPPING] Graceful stop... (click again within 1.5s to force)", [255, 200, 50])
+
     last_stop_press = time.time()
 
 
@@ -1025,6 +2117,14 @@ def save_config():
         "crawler_enabled": dpg.get_value("chk_crawler"),
         "max_depth": dpg.get_value("inp_max_depth"),
     }
+    # Add content type settings
+    if dpg.does_item_exist("content_type_combo"):
+        config["content_type"] = dpg.get_value("content_type_combo")
+    if dpg.does_item_exist("custom_prompt_input"):
+        config["custom_prompt"] = dpg.get_value("custom_prompt_input")
+    if dpg.does_item_exist("custom_sections_input"):
+        config["custom_sections"] = dpg.get_value("custom_sections_input")
+
     try:
         with open(CONFIG_FILE, "w") as f:
             json.dump(config, f, indent=2)
@@ -1054,9 +2154,94 @@ def load_config():
         dpg.set_value("chk_crawler", config.get("crawler_enabled", False))
         dpg.set_value("inp_max_depth", config.get("max_depth", 2))
 
+        # Load content type settings
+        if "content_type" in config and dpg.does_item_exist("content_type_combo"):
+            dpg.set_value("content_type_combo", config["content_type"])
+            on_content_type_change(None, config["content_type"])  # Trigger update
+        if "custom_prompt" in config and dpg.does_item_exist("custom_prompt_input"):
+            dpg.set_value("custom_prompt_input", config["custom_prompt"])
+        if "custom_sections" in config and dpg.does_item_exist("custom_sections_input"):
+            dpg.set_value("custom_sections_input", config["custom_sections"])
+
         log("Config loaded", [0, 255, 100])
     except Exception as e:
         log(f"Load failed: {e}", [255, 100, 100])
+
+
+def filter_existing_dataset():
+    """Filter existing JSONL dataset to remove junk/list pages"""
+    global output_file
+
+    if not os.path.exists(output_file):
+        log(f"No dataset found at: {output_file}", [255, 100, 100])
+        return
+
+    log(f"Filtering dataset: {output_file}", [255, 200, 100])
+
+    def worker():
+        try:
+            # Read all entries
+            entries = []
+            with open(output_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    try:
+                        entries.append(json.loads(line))
+                    except:
+                        pass
+
+            log(f"Read {len(entries)} total entries", [150, 200, 255])
+
+            # Filter entries
+            good_entries = []
+            filtered_reasons = {}
+
+            for entry in entries:
+                text = entry.get('text', '')
+
+                # Extract content from the formatted text
+                # Find the assistant's response
+                if '<|start_header_id|>assistant<|end_header_id|>' in text:
+                    content = text.split('<|start_header_id|>assistant<|end_header_id|>')[1]
+                    content = content.split('<|eot_id|>')[0].strip()
+                else:
+                    content = text
+
+                # Validate content
+                is_valid, reason = validate_content_quality(content, entry.get('url', ''))
+
+                if is_valid:
+                    good_entries.append(entry)
+                else:
+                    filtered_reasons[reason] = filtered_reasons.get(reason, 0) + 1
+
+            # Create backup
+            backup_file = output_file.replace('.jsonl', '_backup.jsonl')
+            import shutil
+            shutil.copy(output_file, backup_file)
+            log(f"Backup saved: {backup_file}", [100, 200, 100])
+
+            # Write filtered data
+            filtered_file = output_file.replace('.jsonl', '_filtered.jsonl')
+            with open(filtered_file, 'w', encoding='utf-8') as f:
+                for entry in good_entries:
+                    f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+
+            # Log results
+            log(f"✓ Filtered dataset saved: {filtered_file}", [100, 255, 100])
+            log(f"  Kept: {len(good_entries)}/{len(entries)} ({len(good_entries) / len(entries) * 100:.1f}%)",
+                [100, 255, 150])
+            log(f"  Removed: {len(entries) - len(good_entries)}", [255, 150, 100])
+
+            # Log reasons
+            if filtered_reasons:
+                log("Filtering breakdown:", [150, 200, 255])
+                for reason, count in sorted(filtered_reasons.items(), key=lambda x: x[1], reverse=True):
+                    log(f"  - {reason}: {count}", [150, 150, 200])
+
+        except Exception as e:
+            log(f"Filter error: {e}", [255, 100, 100])
+
+    threading.Thread(target=worker, daemon=True).start()
 
 
 def update_output_file():
@@ -1124,17 +2309,92 @@ with dpg.window(tag="PrimaryWindow"):
 
         dpg.add_text("LIVE STATS:", color=[150, 150, 150])
         with dpg.group(horizontal=True):
-            dpg.add_text("OK:", color=[0, 255, 0]); dpg.add_text("0", tag="stat_success")
-            dpg.add_text("  Fail:", color=[255, 50, 50]); dpg.add_text("0", tag="stat_failed")
-            dpg.add_text("  Skip:", color=[255, 200, 0]); dpg.add_text("0", tag="stat_skipped")
-            dpg.add_text("  Vol:", color=[0, 200, 255]); dpg.add_text("0k", tag="stat_chars")
-            dpg.add_text("  Speed:", color=[200, 100, 255]); dpg.add_text("0/s", tag="stat_speed")
+            dpg.add_text("OK:", color=[0, 255, 0]);
+            dpg.add_text("0", tag="stat_success")
+            dpg.add_text("  Fail:", color=[255, 50, 50]);
+            dpg.add_text("0", tag="stat_failed")
+            dpg.add_text("  Skip:", color=[255, 200, 0]);
+            dpg.add_text("0", tag="stat_skipped")
+            dpg.add_text("  Junk:", color=[255, 150, 0]);
+            dpg.add_text("0", tag="stat_junk")
+            dpg.add_text("  Vol:", color=[0, 200, 255]);
+            dpg.add_text("0k", tag="stat_chars")
+            dpg.add_text("  Speed:", color=[200, 100, 255]);
+            dpg.add_text("0/s", tag="stat_speed")
+            dpg.add_text("  Quality:", color=[255, 200, 50]);
+            dpg.add_text("0%", tag="stat_quality")
+
+    # === CONTENT TYPE ===
+    with dpg.collapsing_header(label="Content Type Configuration", default_open=True):
+        dpg.add_text("CONTENT TYPE", color=[255, 200, 100])
+        dpg.add_text("Select what type of content you're scraping:", color=[150, 150, 160])
+        dpg.add_spacer(height=5)
+
+        dpg.add_combo(
+            list(CONTENT_TYPES.keys()),
+            label="Content Type",
+            tag="content_type_combo",
+            default_value=DEFAULT_CONTENT_TYPE,
+            callback=on_content_type_change,
+            width=300
+        )
+
+        dpg.add_spacer(height=8)
+        dpg.add_text("PROMPT PREVIEW", color=[150, 150, 160])
+        example_title = CONTENT_TYPES[DEFAULT_CONTENT_TYPE]["example_titles"][0]
+        preview = CONTENT_TYPES[DEFAULT_CONTENT_TYPE]["user_prompt_template"].format(title=example_title)
+        dpg.add_text(f"Preview: {preview}", tag="prompt_preview_text", color=[100, 255, 150])
+
+        dpg.add_spacer(height=10)
+
+        # Section info
+        with dpg.collapsing_header(label="About Sections", default_open=False):
+            dpg.add_text("Content will be organized into these sections:", color=[150, 150, 160])
+            dpg.add_spacer(height=5)
+            dpg.add_text("  Recipe: Ingredients, Instructions", color=[100, 100, 120])
+            dpg.add_text("  Tutorial: Requirements, Steps, Tips", color=[100, 100, 120])
+            dpg.add_text("  Product: Features, Specifications, Reviews", color=[100, 100, 120])
+            dpg.add_text("  Article: Summary, Key Points, Conclusion", color=[100, 100, 120])
+            dpg.add_text("  Documentation: Overview, Usage, Examples, Parameters", color=[100, 100, 120])
+            dpg.add_text("  FAQ: Questions, Answers", color=[100, 100, 120])
+            dpg.add_text("  News: Summary, Details, Context", color=[100, 100, 120])
+
+        # Custom fields (hidden by default)
+        with dpg.group(tag="custom_fields_group", show=False):
+            dpg.add_spacer(height=10)
+            dpg.add_separator()
+            dpg.add_text("CUSTOM CONFIGURATION", color=[255, 200, 100])
+            dpg.add_text("Define your own prompt template and sections:", color=[150, 150, 160])
+
+            dpg.add_spacer(height=5)
+            dpg.add_text("User Prompt Template:")
+            dpg.add_input_text(
+                tag="custom_prompt_input",
+                hint="Use {title} as placeholder, e.g. 'Explain {title} in detail'",
+                width=-1
+            )
+            dpg.add_text("  Use {title} where the page title should appear", color=[100, 100, 120])
+
+            dpg.add_spacer(height=8)
+            dpg.add_text("Content Sections (comma-separated):")
+            dpg.add_input_text(
+                tag="custom_sections_input",
+                hint="Overview, Details, Examples, Notes",
+                width=-1
+            )
+            dpg.add_text("  Leave empty for no specific sections", color=[100, 100, 120])
+
+            dpg.add_spacer(height=5)
+            dpg.add_text("EXAMPLE:", color=[150, 200, 255])
+            dpg.add_text("  Prompt: 'What are the main features of {title}?'", color=[100, 100, 120])
+            dpg.add_text("  Sections: Key Features, Pros, Cons, Price", color=[100, 100, 120])
 
     # === CONCURRENCY ===
     with dpg.collapsing_header(label="Concurrency Settings", default_open=False):
         dpg.add_text("THREAD POOL", color=[150, 150, 160])
         with dpg.group(horizontal=True):
-            dpg.add_input_int(label="Workers", tag="inp_workers", default_value=10, min_value=1, max_value=50, width=100)
+            dpg.add_input_int(label="Workers", tag="inp_workers", default_value=10, min_value=1, max_value=50,
+                              width=100)
             dpg.add_input_float(label="Domain Delay (s)", tag="inp_domain_delay", default_value=1.0, width=100)
             dpg.add_input_int(label="Max Retries", tag="inp_max_retries", default_value=3, width=100)
 
@@ -1167,12 +2427,20 @@ with dpg.window(tag="PrimaryWindow"):
         dpg.add_checkbox(label="Enable Crawler (Follow Links)", tag="chk_crawler", default_value=False)
 
         with dpg.group(horizontal=True):
-            dpg.add_input_int(label="Max Depth", tag="inp_max_depth", default_value=3, min_value=1, max_value=10, width=100)
-            dpg.add_input_int(label="Links Per Page", tag="inp_links_per_page", default_value=20, min_value=1, max_value=100, width=100)
-            dpg.add_input_int(label="Max Per Domain", tag="inp_max_per_domain", default_value=100, min_value=1, max_value=1000, width=100)
+            dpg.add_input_int(label="Max Depth", tag="inp_max_depth", default_value=3, min_value=1, max_value=10,
+                              width=100)
+            dpg.add_input_int(label="Links Per Page", tag="inp_links_per_page", default_value=20, min_value=1,
+                              max_value=100, width=100)
+            dpg.add_input_int(label="Max Per Domain", tag="inp_max_per_domain", default_value=100, min_value=1,
+                              max_value=1000, width=100)
 
         dpg.add_checkbox(label="Stay On Same Domain", tag="chk_same_domain", default_value=True)
         dpg.add_checkbox(label="Prioritize Content Pages", tag="chk_prioritize_content", default_value=True)
+
+        dpg.add_spacer(height=10)
+        dpg.add_text("SMART FEATURES", color=[150, 150, 160])
+        dpg.add_checkbox(label="[*] Automatic Subdomain Discovery", tag="chk_subdomain_discovery", default_value=False)
+        dpg.add_text("  Discovers & crawls www, blog, docs, api, shop, etc.", color=[100, 100, 120])
 
         dpg.add_spacer(height=5)
         dpg.add_text("Depth Guide: 1=seed only, 2=seed+links, 3+=deep crawl", color=[100, 100, 120])
@@ -1187,16 +2455,77 @@ with dpg.window(tag="PrimaryWindow"):
         dpg.add_spacer(height=10)
         dpg.add_text("SIZE", color=[150, 150, 160])
         with dpg.group(horizontal=True):
-            dpg.add_input_int(label="Min Chars", tag="inp_min_chars", default_value=300, width=120)
+            dpg.add_input_int(label="Min Chars", tag="inp_min_chars", default_value=150, width=120)
             dpg.add_input_int(label="Max Chars", tag="inp_max_chars", default_value=50000, width=120)
             dpg.add_input_int(label="Stop After N", tag="inp_stop_limit", default_value=0, width=120)
 
+        dpg.add_spacer(height=5)
+        with dpg.group(horizontal=True):
+            dpg.add_checkbox(label="Allow Short High-Quality Content",
+                             tag="chk_allow_short_quality", default_value=True)
+            dpg.add_input_int(label="Short Min", tag="inp_short_min_chars", default_value=50,
+                              min_value=10, max_value=500, width=100)
+        dpg.add_text("  If enabled: content above 'Short Min' accepted if quality 70+ (ignores regular Min Chars)",
+                     color=[100, 100, 120])
+
+        dpg.add_spacer(height=5)
+        dpg.add_checkbox(label="Ignore Quality Filter for Short Content",
+                         tag="chk_ignore_quality_short", default_value=False)
+        dpg.add_text("  If enabled: accepts ALL content above 'Short Min' regardless of quality", color=[100, 100, 120])
+        dpg.add_text("  WARNING: Will include navigation/junk. Only use if you need everything.", color=[255, 150, 100])
+
         dpg.add_spacer(height=10)
-        dpg.add_text("KEYWORDS (comma separated)", color=[150, 150, 160])
-        dpg.add_input_text(label="Must Contain", tag="inp_kw_in", width=-1)
-        dpg.add_input_text(label="Exclude If", tag="inp_kw_out", width=-1)
-        dpg.add_input_text(label="Domain Blacklist", tag="inp_domain_bl", width=-1,
-                           hint="facebook.com, twitter.com")
+        with dpg.collapsing_header(label="Keywords & Blacklist", default_open=False):
+            dpg.add_text("KEYWORDS (comma separated)", color=[150, 150, 160])
+            dpg.add_input_text(label="Must Contain", tag="inp_kw_in", width=-1,
+                               hint="recipe, ingredient, cooking")
+            dpg.add_input_text(label="Exclude If", tag="inp_kw_out", width=-1,
+                               hint="privacy policy, terms of use, faq, about us, patreon")
+            dpg.add_spacer(height=5)
+            dpg.add_text("DOMAIN BLACKLIST (comma separated)", color=[150, 150, 160])
+            dpg.add_input_text(tag="inp_domain_bl", width=-1,
+                               hint="facebook.com, twitter.com, pinterest.com")
+            dpg.add_text("  Pages from these domains will be skipped", color=[100, 100, 120])
+
+        dpg.add_spacer(height=10)
+        dpg.add_text("[QUALITY] NTTuner QUALITY FILTER", color=[255, 200, 50])
+        dpg.add_checkbox(label="Enable Intelligent Quality Filtering", tag="chk_quality_filter", default_value=True)
+        dpg.add_text("  Filters content based on information density & educational value", color=[100, 100, 120])
+
+        dpg.add_spacer(height=5)
+        with dpg.group(horizontal=True):
+            dpg.add_text("Quality Threshold:", color=[200, 200, 210])
+            dpg.add_slider_int(tag="inp_quality_threshold", default_value=35, min_value=0, max_value=100, width=200)
+            dpg.add_text("(0=accept all, 100=only excellent)", color=[100, 100, 120])
+
+        dpg.add_spacer(height=5)
+        dpg.add_text("  Scoring factors:", color=[120, 180, 220])
+        dpg.add_text("    - Information density (30%): how-to, tutorials, explanations", color=[100, 100, 120])
+        dpg.add_text("    - Educational value (25%): technical, analytical content", color=[100, 100, 120])
+        dpg.add_text("    - Structure quality (15%): lists, headers, paragraphs", color=[100, 100, 120])
+        dpg.add_text("    - Noise level (15%): filters ads, navigation, placeholders", color=[100, 100, 120])
+        dpg.add_text("    - Length (10%): sweet spot 800-5000 chars", color=[100, 100, 120])
+        dpg.add_text("    - URL quality (5%): /blog/, /article/, /recipe/ patterns", color=[100, 100, 120])
+
+        dpg.add_spacer(height=8)
+        dpg.add_text("  Quality Score Ranges:", color=[150, 200, 255])
+
+        # Visual quality range indicators
+        with dpg.group(horizontal=True):
+            dpg.add_text("    0-49:", color=[255, 100, 100])
+            dpg.add_text("Poor (filtered)", color=[150, 150, 160])
+        with dpg.group(horizontal=True):
+            dpg.add_text("   50-64:", color=[255, 200, 100])
+            dpg.add_text("Fair (basic content)", color=[150, 150, 160])
+        with dpg.group(horizontal=True):
+            dpg.add_text("   65-79:", color=[150, 255, 100])
+            dpg.add_text("Good (quality content)", color=[150, 150, 160])
+        with dpg.group(horizontal=True):
+            dpg.add_text("  80-100:", color=[50, 255, 100])
+            dpg.add_text("Excellent (information-rich)", color=[150, 150, 160])
+
+        dpg.add_spacer(height=5)
+        dpg.add_text("  [TIP] Recommended: 50 for general, 65 for high-quality only", color=[150, 200, 255])
 
     # === PROMPT ===
     with dpg.collapsing_header(label="Prompt & Template", default_open=False):
@@ -1218,6 +2547,11 @@ with dpg.window(tag="PrimaryWindow"):
         dpg.add_text("OUTPUT FILE", color=[150, 150, 160])
         dpg.add_input_text(default_value=output_file, tag="out_file", width=-1, readonly=True)
         dpg.add_button(label="Select...", callback=update_output_file, width=100)
+
+        dpg.add_spacer(height=10)
+        dpg.add_text("POST-PROCESSING", color=[150, 150, 160])
+        dpg.add_button(label="Filter Existing Dataset", callback=lambda: filter_existing_dataset(), width=200)
+        dpg.add_text("  Removes junk/list pages from current output file", color=[100, 100, 120])
 
         dpg.add_spacer(height=10)
         dpg.add_checkbox(label="Log to File", tag="chk_log_file", default_value=False)
