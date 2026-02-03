@@ -1,0 +1,48 @@
+# NTCompanion Enhanced - Requirements
+# Version: build.2026.06
+
+# Required dependencies
+dearpygui>=1.10.1
+
+# Highly recommended (for better HTML parsing)
+beautifulsoup4>=4.12.0
+
+# Optional (for memory-efficient large crawls)
+# Uncomment to enable Bloom filter support
+mmh3>=4.1.0
+
+# Standard library (already included in Python)
+# - urllib
+# - ssl
+# - json
+# - threading
+# - tkinter (usually pre-installed)
+# - re
+# - os
+# - time
+# - queue
+# - dataclasses
+# - typing
+# - collections
+# - heapq
+# - datetime
+# - concurrent.futures
+# - random
+# - http.cookiejar
+
+# Platform-specific (Windows only)
+# - winsound (built-in on Windows)
+
+# Installation instructions:
+# 
+# Minimal (required only):
+#   pip install dearpygui
+#
+# Recommended (better parsing):
+#   pip install dearpygui beautifulsoup4
+#
+# Full (all features):
+#   pip install -r requirements.txt
+#
+# Or install everything:
+#   pip install dearpygui beautifulsoup4 mmh3
