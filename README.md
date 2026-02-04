@@ -4,8 +4,6 @@
 
 # NTCompanion Enhanced - Universal Web Scraper for NTTuner
 
-**Version:** build.2026.06.Enhanced+Universal+BugFix
-
 A powerful, universal web scraper designed specifically for creating high-quality fine-tuning datasets compatible with [NTTuner](https://github.com/noosed/nttuner).
 
 ## Key Features
