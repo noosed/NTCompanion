@@ -1,6 +1,7 @@
 
 
-<img width="1000" height="720" alt="image" src="https://github.com/user-attachments/assets/d11cf703-e21f-4b95-b355-74c4e2924b52" />
+<img width="503" height="305" alt="image" src="https://github.com/user-attachments/assets/5e96cac3-c813-4be0-8820-ed3e26b139c6" />
+
 
 # NTCompanion Enhanced - Universal Web Scraper for NTTuner
 
