@@ -1,6 +1,6 @@
 
 
-<img width="503" height="305" alt="image" src="https://github.com/user-attachments/assets/66f421ec-dc25-4a9a-8cba-e5e846829ef7" />
+<div align="center"><img width="503" height="305" alt="image" src="https://github.com/user-attachments/assets/66f421ec-dc25-4a9a-8cba-e5e846829ef7" /></div>
 
 
 # 🚀 NTCompanion Pro
