@@ -42,8 +42,18 @@ except ImportError:
 # ================================================================
 CONFIG_FILE = "nttuner_config_pro.json"
 INI_FILE = "ntcompanion_pro.ini"
-VERSION = "build.2026.05.Pro+Enhanced+ContentTypes"
+VERSION = "build.2026.05.Pro+Enhanced+ContentTypes+Codebase"
 MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB
+
+# Code file extensions to process - CODEBASE FEATURE
+CODE_EXTENSIONS = {
+    '.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.cpp', '.c', '.h', '.hpp',
+    '.cs', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.r',
+    '.m', '.mm', '.sh', '.bash', '.ps1', '.sql', '.html', '.css', '.scss',
+    '.less', '.vue', '.svelte', '.dart', '.lua', '.perl', '.pl', '.hs',
+    '.ml', '.fs', '.ex', '.exs', '.clj', '.lisp', '.scm', '.erl', '.elm'
+}
+
 
 # Concurrency defaults
 DEFAULT_WORKERS = 10
@@ -185,6 +195,12 @@ CONTENT_TYPES = {
         "detail_sections": ["Overview", "Symptoms", "Treatment", "Prevention"],
         "system_prompt": "You are a medical information assistant. Provide factual information but remind users to consult healthcare professionals.",
         "example_titles": ["Type 2 Diabetes", "Hypertension Management"]
+    },
+        "Code File": {
+        "user_prompt_template": "Explain this code from {title}",
+        "detail_sections": ["Purpose", "Key Functions", "Usage"],
+        "system_prompt": "You are an expert programmer who explains code clearly and concisely.",
+        "example_titles": ["main.py", "UserController.java", "utils.js"]
     },
     "Custom": {
         "user_prompt_template": "{title}",
@@ -504,6 +520,303 @@ class CrawlQueue:
 
 # Global crawl queue
 crawl_queue = CrawlQueue()
+
+# ================================================================
+# CODEBASE SCANNER - NEW FEATURE
+# ================================================================
+def scan_codebase_folder(folder_path: str) -> List[Tuple[str, str]]:
+    """Recursively scan a folder for code files."""
+    code_files = []
+    
+    for root, dirs, files in os.walk(folder_path):
+        dirs[:] = [d for d in dirs if d not in {
+            '.git', '.svn', '.hg', '__pycache__', 'node_modules', 
+            '.venv', 'venv', 'env', 'build', 'dist', '.idea', 
+            '.vscode', 'target', 'bin', 'obj', '.gradle'
+        }]
+        
+        for file in files:
+            _, ext = os.path.splitext(file)
+            if ext.lower() in CODE_EXTENSIONS:
+                full_path = os.path.join(root, file)
+                rel_path = os.path.relpath(full_path, folder_path)
+                code_files.append((full_path, rel_path))
+    
+    return code_files
+
+
+def read_code_file(file_path: str, max_size: int = 100000) -> Optional[str]:
+    """Read a code file with proper encoding detection."""
+    try:
+        if not os.path.exists(file_path):
+            return None
+            
+        file_size = os.path.getsize(file_path)
+        if file_size > max_size or file_size == 0:
+            return None
+        
+        encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        
+        for encoding in encodings:
+            try:
+                with open(file_path, 'r', encoding=encoding, errors='ignore') as f:
+                    content = f.read()
+                    
+                if '\x00' in content:
+                    return None
+                
+                if len(content.strip()) < 10:
+                    return None
+                    
+                return content
+            except (UnicodeDecodeError, UnicodeError, PermissionError):
+                continue
+            except Exception:
+                return None
+        
+        return None
+    except Exception:
+        return None
+
+
+def extract_code_metadata(content: str, file_path: str) -> Dict[str, any]:
+    """Extract metadata from code content."""
+    metadata = {
+        'functions': [],
+        'classes': [],
+        'imports': [],
+        'comments': 0,
+        'lines': len(content.split('\n'))
+    }
+    
+    func_patterns = [
+        r'def\s+(\w+)\s*\(',
+        r'function\s+(\w+)\s*\(',
+        r'(?:public|private|protected)?\s*\w+\s+(\w+)\s*\([^)]*\)\s*{',
+    ]
+    
+    for pattern in func_patterns:
+        metadata['functions'].extend(re.findall(pattern, content))
+    
+    class_patterns = [r'class\s+(\w+)']
+    for pattern in class_patterns:
+        metadata['classes'].extend(re.findall(pattern, content))
+    
+    comment_patterns = [r'#[^\n]*', r'//[^\n]*', r'/\*.*?\*/']
+    for pattern in comment_patterns:
+        metadata['comments'] += len(re.findall(pattern, content, re.DOTALL))
+    
+    return metadata
+
+
+def format_code_for_training(file_path: str, rel_path: str, content: str, 
+                             metadata: Dict, config: Dict) -> str:
+    """Format code file content for training data."""
+    parts = []
+    parts.append(f"File: {rel_path}")
+    parts.append(f"Language: {os.path.splitext(file_path)[1][1:]}")
+    parts.append(f"Lines: {metadata['lines']}")
+    
+    if metadata['functions']:
+        parts.append(f"Functions: {', '.join(metadata['functions'][:10])}")
+    if metadata['classes']:
+        parts.append(f"Classes: {', '.join(metadata['classes'][:10])}")
+    
+    parts.append("\nCode:\n")
+    parts.append(content)
+    
+    return "\n".join(parts)
+
+
+def process_code_file(file_path: str, rel_path: str, config: Dict) -> Dict:
+    """Process a single code file for dataset generation."""
+    if stop_requested or force_stop:
+        return {'success': False, 'error': None, 'chars': 0, 'filtered': True}
+    
+    content = read_code_file(file_path, config.get('max_chars', 100000))
+    
+    if content is None:
+        log(f"  [SKIP] Could not read: {rel_path}", [150, 150, 150])
+        return {'success': False, 'error': 'Could not read file', 'chars': 0, 'filtered': True}
+    
+    content_len = len(content)
+    min_chars = config.get('min_chars', 50)
+    
+    if content_len < min_chars:
+        log(f"  [SKIP] Too short ({content_len}): {rel_path}", [150, 150, 150])
+        return {'success': False, 'error': None, 'chars': 0, 'filtered': True}
+    
+    metadata = extract_code_metadata(content, file_path)
+    formatted_content = format_code_for_training(file_path, rel_path, content, metadata, config)
+    
+    system_prompt = config.get('system_prompt', '')
+    template_key = config.get('template', DEFAULT_TEMPLATE_KEY)
+    content_type_cfg = CONTENT_TYPES.get("Code File", CONTENT_TYPES["Custom"])
+    final_text = build_text(system_prompt, formatted_content, template_key, content_type_cfg)
+    
+    with write_lock:
+        try:
+            with open(output_file, 'a', encoding='utf-8') as f:
+                f.write(json.dumps({"text": final_text}, ensure_ascii=False) + "\n")
+        except Exception as e:
+            log(f"  [!] Write error: {e}", [255, 100, 100])
+            return {'success': False, 'error': str(e), 'chars': 0, 'filtered': False}
+    
+    funcs = len(metadata['functions'])
+    classes = len(metadata['classes'])
+    log(f"  [+] {rel_path} ({content_len} chars, {funcs}F/{classes}C)", [0, 255, 150])
+    
+    return {'success': True, 'error': None, 'chars': content_len, 'filtered': False}
+
+
+def process_codebase_worker():
+    """Worker function for processing code files from a folder"""
+    global is_running, stop_requested, force_stop, stats
+    
+    try:
+        folder_path = dpg.get_value("codebase_folder_path")
+        
+        if not folder_path or not os.path.isdir(folder_path):
+            log("Invalid folder path", [255, 100, 100])
+            is_running = False
+            return
+        
+        for k in stats:
+            stats[k] = 0
+        
+        config = {
+            "system_prompt": dpg.get_value("system_prompt_input"),
+            "template": dpg.get_value("template_combo"),
+            "min_chars": dpg.get_value("inp_min_chars"),
+            "max_chars": dpg.get_value("inp_max_chars"),
+        }
+        
+        log(f"Scanning codebase: {folder_path}", [100, 200, 255])
+        
+        try:
+            code_files = scan_codebase_folder(folder_path)
+        except PermissionError as e:
+            log(f"Permission denied: {e}", [255, 100, 100])
+            is_running = False
+            return
+        except Exception as e:
+            log(f"Error scanning folder: {e}", [255, 100, 100])
+            is_running = False
+            return
+        
+        if not code_files:
+            log("No code files found", [255, 150, 100])
+            is_running = False
+            return
+        
+        log(f"Found {len(code_files)} code files", [100, 255, 150])
+        
+        num_workers = dpg.get_value("inp_workers")
+        start_time = time.time()
+        processed_count = 0
+        
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            futures = {}
+            
+            for fp, rp in code_files:
+                try:
+                    future = executor.submit(process_code_file, fp, rp, config)
+                    futures[future] = (fp, rp)
+                except Exception as e:
+                    log(f"Error submitting task for {rp}: {e}", [255, 150, 100])
+                    continue
+            
+            for future in as_completed(futures):
+                if force_stop or stop_requested:
+                    log("[STOP] Cancelling remaining tasks...", [255, 200, 100])
+                    for f in futures:
+                        f.cancel()
+                    break
+                
+                file_path, rel_path = futures[future]
+                processed_count += 1
+                
+                try:
+                    result = future.result(timeout=30)
+                    
+                    if result.get('success'):
+                        stats["success"] += 1
+                        stats["total_chars"] += result.get('chars', 0)
+                    else:
+                        if result.get('error'):
+                            stats["failed"] += 1
+                        else:
+                            stats["skipped"] += 1
+                    
+                except TimeoutError:
+                    stats["failed"] += 1
+                    log(f"  [!] Timeout processing {rel_path}", [255, 100, 100])
+                except Exception as e:
+                    stats["failed"] += 1
+                    log(f"  [!] Error processing {rel_path}: {e}", [255, 100, 100])
+                
+                elapsed = time.time() - start_time
+                if elapsed > 0:
+                    stats["speed"] = processed_count / elapsed
+                
+                update_stats_ui()
+                
+                progress = processed_count / len(code_files)
+                try:
+                    dpg.set_value("progress_bar", progress)
+                    label = f"Done: {processed_count}/{len(code_files)} | OK: {stats['success']}"
+                    dpg.configure_item("progress_bar", label=label)
+                except:
+                    pass
+        
+        elapsed = time.time() - start_time
+        log(f"Codebase processing complete. Success: {stats['success']}, Failed: {stats['failed']}, Time: {elapsed:.1f}s",
+            [0, 255, 200])
+        
+        if dpg.get_value("chk_sound") and HAS_WINSOUND:
+            try:
+                winsound.MessageBeep()
+            except:
+                pass
+    
+    except Exception as e:
+        log(f"Critical error in worker: {e}", [255, 100, 100])
+        import traceback
+        log(f"Traceback: {traceback.format_exc()}", [255, 100, 100])
+    
+    finally:
+        is_running = stop_requested = force_stop = False
+        try:
+            dpg.set_value("progress_bar", 0.0)
+            dpg.configure_item("progress_bar", label="IDLE")
+        except:
+            pass
+
+
+def select_codebase_folder():
+    """Open folder selection dialog"""
+    root = tk.Tk()
+    root.withdraw()
+    folder = filedialog.askdirectory(title="Select Codebase Folder")
+    root.destroy()
+    
+    if folder:
+        dpg.set_value("codebase_folder_path", folder)
+        log(f"Selected folder: {folder}")
+
+
+def start_codebase_processing():
+    """Start processing codebase"""
+    global is_running, stop_requested, force_stop
+    
+    if is_running:
+        return
+    
+    is_running = True
+    stop_requested = force_stop = False
+    threading.Thread(target=process_codebase_worker, daemon=True).start()
+
+
 
 
 # ================================================================
@@ -2323,6 +2636,54 @@ with dpg.window(tag="PrimaryWindow"):
             dpg.add_text("0/s", tag="stat_speed")
             dpg.add_text("  Quality:", color=[255, 200, 50]);
             dpg.add_text("0%", tag="stat_quality")
+
+    # === CODEBASE MODE - NEW FEATURE ===
+    with dpg.collapsing_header(label="Codebase Dataset Builder", default_open=False):
+        dpg.add_text("BUILD DATASET FROM CODE FOLDER", color=[255, 200, 100])
+        dpg.add_text("Recursively scan a codebase folder and create training data from code files", 
+                     color=[150, 150, 160])
+        
+        dpg.add_spacer(height=8)
+        dpg.add_text("FOLDER PATH", color=[150, 150, 160])
+        
+        with dpg.group(horizontal=True):
+            dpg.add_input_text(tag="codebase_folder_path", width=-100, 
+                               hint="Select folder containing code...")
+            dpg.add_button(label="Browse...", callback=select_codebase_folder, width=90)
+        
+        dpg.add_spacer(height=8)
+        dpg.add_text("SUPPORTED LANGUAGES", color=[150, 150, 160])
+        dpg.add_text("Python, JavaScript, TypeScript, Java, C/C++, C#, Go, Rust, Ruby, PHP,", 
+                     color=[100, 100, 120])
+        dpg.add_text("Swift, Kotlin, Scala, R, Shell, SQL, HTML, CSS, and 30+ more...", 
+                     color=[100, 100, 120])
+        
+        dpg.add_spacer(height=10)
+        
+        codebase_btn = dpg.add_button(label="START CODEBASE PROCESSING", 
+                                      callback=start_codebase_processing, 
+                                      width=250, height=35)
+        with dpg.theme() as codebase_theme:
+            with dpg.theme_component(dpg.mvButton):
+                dpg.add_theme_color(dpg.mvThemeCol_Button, [40, 80, 120])
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [60, 100, 150])
+        dpg.bind_item_theme(codebase_btn, codebase_theme)
+        
+        dpg.add_spacer(height=8)
+        dpg.add_text("FEATURES:", color=[150, 200, 255])
+        dpg.add_text("  • Automatically skips .git, node_modules, __pycache__, build folders", 
+                     color=[100, 100, 120])
+        dpg.add_text("  • Extracts functions, classes, and code structure", 
+                     color=[100, 100, 120])
+        dpg.add_text("  • Multi-threaded processing for speed", 
+                     color=[100, 100, 120])
+        dpg.add_text("  • Uses same output file and settings as web scraping", 
+                     color=[100, 100, 120])
+        
+        dpg.add_spacer(height=8)
+        dpg.add_text("TIP: Set Content Type to 'Code File' for best results", 
+                     color=[255, 200, 100])
+
 
     # === CONTENT TYPE ===
     with dpg.collapsing_header(label="Content Type Configuration", default_open=True):
