@@ -2,43 +2,33 @@
 
 <div align="center"><img width="503" height="305" alt="image" src="https://github.com/user-attachments/assets/66f421ec-dc25-4a9a-8cba-e5e846829ef7" /></div>
 
-
-# 🚀 NTCompanion Pro
-
-<div align="center">
-
-![NTCompanion Banner](https://img.shields.io/badge/NTCompanion-Pro-blue?style=for-the-badge)
-![Python](https://img.shields.io/badge/Python-3.8+-green?style=for-the-badge&logo=python)
-![License](https://img.shields.io/badge/License-Educational-orange?style=for-the-badge)
+# NTCompanion Pro
 
 **Professional Dataset Engine for Training Better AI Models**
 
-*Your AI is only as good as the data it learns from. Let's fix that.*
+> Your AI is only as good as the data it learns from. Let's fix that.
 
-[Features](#-features) • [Installation](#-installation) • [Quick Start](#-quick-start) • [Tutorial](#-complete-tutorial) • [NTTuner Integration](#-working-with-nttuner)
-
-</div>
+A powerful web scraping and dataset creation tool designed specifically to work with [NTTuner](https://github.com/noosed/NTTuner). Built for people who want to fine-tune language models but don't want to spend days manually collecting training data.
 
 ---
 
-## 🤔 What is NTCompanion?
+## What is NTCompanion?
 
 Ever tried to fine-tune an AI model and realized you need thousands of high-quality training examples? Yeah, that's painful. 
 
-**NTCompanion** is a powerful web scraping and dataset creation tool designed specifically to work with [NTTuner](https://github.com/noosed/NTTuner). It helps you:
+NTCompanion automates the entire process. Point it at websites you want to learn from, and it'll scrape, filter, and format everything into a clean dataset ready for fine-tuning with NTTuner.
 
-- **Collect training data** from any website automatically
-- **Filter out the junk** using intelligent quality scoring
-- **Format everything perfectly** for fine-tuning with NTTuner
-- **Build specialized datasets** for recipes, tutorials, docs, code, and more
-
-Think of it as your personal data collection assistant that knows exactly what NTTuner needs.
+**What it does:**
+- Collects training data from any website automatically
+- Filters out junk using intelligent quality scoring
+- Formats everything perfectly for NTTuner
+- Builds specialized datasets for recipes, tutorials, docs, code, and more
 
 ---
 
-## ✨ Features
+## Features
 
-### 🌐 Smart Web Scraping
+### Smart Web Scraping
 
 - **Multi-threaded crawling** - Process 10-50 pages simultaneously
 - **Intelligent link discovery** - Automatically finds and follows relevant links
@@ -47,9 +37,9 @@ Think of it as your personal data collection assistant that knows exactly what N
 - **Rate limiting** - Be respectful to websites (automatic throttling)
 - **User agent rotation** - Uses 15+ realistic browser signatures
 
-### 🎯 Quality Filtering (The Secret Sauce)
+### Quality Filtering (The Important Part)
 
-Not all web content is worth training on. NTCompanion includes a sophisticated **6-factor quality scoring system**:
+Not all web content is worth training on. NTCompanion includes a 6-factor quality scoring system:
 
 1. **Information Density (30%)** - Finds how-tos, tutorials, explanations
 2. **Educational Value (25%)** - Detects technical, analytical content  
@@ -59,12 +49,12 @@ Not all web content is worth training on. NTCompanion includes a sophisticated *
 6. **URL Quality (5%)** - Recognizes quality patterns like /blog/, /article/
 
 **Quality Score Ranges:**
-- 🔴 **0-49**: Poor - Filtered out
-- 🟡 **50-64**: Fair - Basic content
-- 🟢 **65-79**: Good - Quality content
-- ⭐ **80-100**: Excellent - Information-rich
+- **0-49**: Poor - Filtered out
+- **50-64**: Fair - Basic content
+- **65-79**: Good - Quality content
+- **80-100**: Excellent - Information-rich
 
-### 💾 Content Type Presets
+### Content Type Presets
 
 Pre-optimized configurations for different types of content:
 
@@ -79,19 +69,19 @@ Pre-optimized configurations for different types of content:
 | **Product Info** | E-commerce | Product pages |
 | **Code File** | GitHub repos | Source code |
 
-### 🧠 NTTuner Perfect Integration
+### NTTuner Integration
 
 Outputs data in exactly the format NTTuner expects:
 
-- ✅ Proper JSONL formatting
-- ✅ Chat template support (Llama, Mistral, Qwen, Phi, Gemma)
-- ✅ System prompt configuration
-- ✅ Custom user prompt templates per content type
-- ✅ Ready for immediate fine-tuning
+- Proper JSONL formatting
+- Chat template support (Llama, Mistral, Qwen, Phi, Gemma)
+- System prompt configuration
+- Custom user prompt templates per content type
+- Ready for immediate fine-tuning
 
-### 💻 Code & GitHub Support
+### Code & GitHub Support
 
-**NEW!** Process entire codebases:
+Process entire codebases:
 
 - Local folder scanning (auto-skips node_modules, .git, etc.)
 - GitHub repository cloning and processing
@@ -101,7 +91,7 @@ Outputs data in exactly the format NTTuner expects:
 
 ---
 
-## 📦 Installation
+## Installation
 
 ### System Requirements
 
@@ -120,7 +110,7 @@ cd NTCompanion
 # 2. Install required dependencies
 pip install dearpygui
 
-# 3. That's it! (Optional dependencies below)
+# 3. That's it (Optional dependencies below)
 ```
 
 ### Optional (But Recommended) Dependencies
@@ -145,11 +135,11 @@ pip install beautifulsoup4 lxml mmh3 gitpython
 python NTCompanion.py
 ```
 
-You should see the GUI window pop up. If it does, you're ready to go!
+You should see the GUI window pop up. If it does, you're ready to go.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Your First Dataset in 5 Minutes
 
@@ -184,11 +174,11 @@ Let's scrape a cooking website to create a recipe dataset:
    - Wait for "Scraping complete!" message
    - Your data is saved to `scraped_data.jsonl`
 
-**That's it!** You now have a recipe dataset ready for NTTuner.
+That's it. You now have a recipe dataset ready for NTTuner.
 
 ---
 
-## 📚 Complete Tutorial
+## Complete Tutorial
 
 ### Understanding Crawl Depth
 
@@ -196,11 +186,11 @@ Let's scrape a cooking website to create a recipe dataset:
 
 - **Depth 1**: Only scrapes the exact URLs you provide
   - Use when: You have a specific list of pages
-  - Result: Fast, precise, ~10-50 pages
+  - Result: Fast, precise, around 10-50 pages
 
-- **Depth 2**: Scrapes seeds + all links found on those pages ⭐ **RECOMMENDED**
+- **Depth 2**: Scrapes seeds plus all links found on those pages (RECOMMENDED)
   - Use when: You want to explore a section thoroughly
-  - Result: Medium speed, ~50-500 pages
+  - Result: Medium speed, around 50-500 pages
 
 - **Depth 3+**: Goes deeper into the site hierarchy
   - Use when: You want comprehensive coverage
@@ -220,7 +210,7 @@ Keywords Must Contain: tutorial, guide, how-to, explained
 Keywords Exclude: subscribe, buy now, ad, promotion
 Quality Threshold: 70
 Min Chars: 500
-Same Domain Only: ✓ Enabled
+Same Domain Only: Enabled
 ```
 
 **Result**: Only keeps well-written, informative articles.
@@ -233,7 +223,7 @@ Keywords Must Contain: API, function, parameter, example
 Keywords Exclude: pricing, contact, enterprise
 Quality Threshold: 75
 Min Chars: 300
-Ignore Quality for Short Content: ✗ Disabled
+Ignore Quality for Short Content: Disabled
 ```
 
 **Result**: Technical documentation with code examples.
@@ -245,7 +235,7 @@ Content Type: Recipe
 Keywords Must Contain: ingredients, instructions, servings
 Keywords Exclude: sponsored, affiliate, advertisement
 Quality Threshold: 60
-Allow Short High-Quality Content: ✓ Enabled
+Allow Short High-Quality Content: Enabled
 Short Min: 150
 ```
 
@@ -256,32 +246,16 @@ Short Min: 150
 Not sure which content type to use? Here's a decision tree:
 
 ```
-📄 Scraping what?
-├─ 🍔 Food/cooking website? → Recipe
-├─ 📖 How-to guides/tutorials? → Tutorial/How-To
-├─ 📝 News/opinion articles? → Article/Blog
-├─ 🛠️ Technical documentation? → Documentation
-├─ ❓ FAQ/support pages? → FAQ
-├─ 🛒 Product descriptions? → Product Info
-├─ 💻 GitHub/source code? → Code File
-└─ 🤷 Not sure? → Generic/Auto-detect
+What are you scraping?
+├─ Food/cooking website? → Recipe
+├─ How-to guides/tutorials? → Tutorial/How-To
+├─ News/opinion articles? → Article/Blog
+├─ Technical documentation? → Documentation
+├─ FAQ/support pages? → FAQ
+├─ Product descriptions? → Product Info
+├─ GitHub/source code? → Code File
+└─ Not sure? → Generic/Auto-detect
 ```
-
-### Advanced: Using the Subdomain Crawler
-
-Enable **Automatic Subdomain Discovery** to explore related subdomains:
-
-**Example**: Starting from `example.com`, it will discover and crawl:
-- www.example.com
-- blog.example.com
-- docs.example.com
-- api.example.com
-- shop.example.com
-
-**When to use**:
-- ✅ Large sites with multiple subdomains
-- ✅ Documentation split across docs.*, help.*, support.*
-- ❌ When you want focused, specific content
 
 ### Working with Code Repositories
 
@@ -312,11 +286,11 @@ NTCompanion can process entire codebases:
    - Click **"START CODEBASE PROCESSING"**
 
 **Supported Languages**:
-Python, JavaScript, TypeScript, Java, C/C++, C#, Go, Rust, Ruby, PHP, Swift, Kotlin, Scala, R, Shell, SQL, HTML, CSS, and 30+ more!
+Python, JavaScript, TypeScript, Java, C/C++, C#, Go, Rust, Ruby, PHP, Swift, Kotlin, Scala, R, Shell, SQL, HTML, CSS, and 30+ more.
 
 ---
 
-## 🤝 Working with NTTuner
+## Working with NTTuner
 
 The entire point of NTCompanion is to create data for [NTTuner](https://github.com/noosed/NTTuner). Here's the complete workflow:
 
@@ -372,8 +346,8 @@ This tells you how many training examples you have.
 
 5. **Configure Output**:
    - **Model Name**: Give it a meaningful name
-   - **Quantization**: q5\_k\_m (good balance)
-   - **Import to Ollama**: ✓ Enabled
+   - **Quantization**: q5_k_m (good balance)
+   - **Import to Ollama**: Enabled
 
 6. **Click "Start Training"**
 
@@ -390,7 +364,7 @@ ollama run your-model-name
 >>> Can you explain how to make chocolate chip cookies?
 ```
 
-Your model should now respond with knowledge from your scraped dataset!
+Your model should now respond with knowledge from your scraped dataset.
 
 ### Template Matching
 
@@ -404,11 +378,11 @@ Your model should now respond with knowledge from your scraped dataset!
 | microsoft/Phi-4 | Phi-4 Instruct |
 | google/gemma-2-* | Gemma-2 Instruct |
 
-**If they don't match**, NTTuner won't be able to parse your dataset correctly!
+**If they don't match**, NTTuner won't be able to parse your dataset correctly.
 
 ---
 
-## ⚙️ Configuration Guide
+## Configuration Guide
 
 ### Saving & Loading Configs
 
@@ -432,7 +406,7 @@ Your model should now respond with knowledge from your scraped dataset!
 System prompts define how the AI should behave. NTCompanion includes presets:
 
 - **Blank**: No system prompt (rare use case)
-- **Helpful Assistant**: General purpose ⭐ **RECOMMENDED**
+- **Helpful Assistant**: General purpose (RECOMMENDED)
 - **Data Summarizer**: For summarization tasks
 - **Code Expert**: For technical/code content
 - **Creative Writer**: For narrative, story-like content
@@ -446,7 +420,7 @@ international cuisine. Provide detailed, step-by-step
 instructions and explain cooking techniques clearly.
 ```
 
-Click dropdown → Select "Helpful Assistant" → Modify the text box → Done!
+Click dropdown, select "Helpful Assistant", modify the text box, done.
 
 ### Understanding User Prompts
 
@@ -463,9 +437,9 @@ The AI learns to respond to questions like this with the scraped content.
 
 ---
 
-## 🎯 Best Practices
+## Best Practices
 
-### Do's ✅
+### Do's
 
 1. **Start small** - Test with 2-3 URLs before scaling up
 2. **Use quality filtering** - Don't disable it unless you have a reason
@@ -476,7 +450,7 @@ The AI learns to respond to questions like this with the scraped content.
 7. **Monitor the console** - Watch for patterns in failures
 8. **Iterate** - Adjust filters based on initial results
 
-### Don'ts ❌
+### Don'ts
 
 1. **Don't skip quality filtering** - You'll get lots of junk
 2. **Don't use depth 5+** - You'll scrape forever (and maybe get blocked)
@@ -514,7 +488,7 @@ Subdomain Discovery: Enabled
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -581,7 +555,7 @@ Subdomain Discovery: Enabled
 
 ---
 
-## 📊 Example Workflows
+## Example Workflows
 
 ### Workflow 1: Recipe Dataset for Cooking Chatbot
 
@@ -667,9 +641,9 @@ NTTuner Settings:
 
 ---
 
-## 🔒 Legal & Ethical Usage
+## Legal & Ethical Usage
 
-### ⚖️ Legal Considerations
+### Legal Considerations
 
 **Before scraping a website**:
 1. Check their `robots.txt` file (scraper respects this automatically)
@@ -683,13 +657,13 @@ NTTuner Settings:
 - Use for research/personal projects is generally safer
 - Commercial use requires more caution
 
-### 🤝 Be Respectful
+### Be Respectful
 
 **NTCompanion includes built-in protections**:
-- ✅ Rate limiting per domain
-- ✅ User agent rotation
-- ✅ Respects robots.txt
-- ✅ Exponential backoff on errors
+- Rate limiting per domain
+- User agent rotation
+- Respects robots.txt
+- Exponential backoff on errors
 
 **But you should still**:
 - Keep workers reasonable (10-20 is plenty)
@@ -698,29 +672,29 @@ NTTuner Settings:
 - Don't scrape personal/private data
 - Consider the website's resources
 
-### ✅ Good Use Cases
+### Good Use Cases
 
-- ✅ Publicly accessible content
-- ✅ Educational research
-- ✅ Personal learning projects
-- ✅ Non-commercial fine-tuning
-- ✅ Your own content scattered across sites
-- ✅ Open-source documentation
+- Publicly accessible content
+- Educational research
+- Personal learning projects
+- Non-commercial fine-tuning
+- Your own content scattered across sites
+- Open-source documentation
 
-### ❌ Bad Use Cases
+### Bad Use Cases
 
-- ❌ Circumventing paywalls
-- ❌ Collecting personal information
-- ❌ Commercial scraping without permission
-- ❌ Social media at scale
-- ❌ Financial/trading data (use official APIs)
-- ❌ Anything explicitly forbidden in ToS
+- Circumventing paywalls
+- Collecting personal information
+- Commercial scraping without permission
+- Social media at scale
+- Financial/trading data (use official APIs)
+- Anything explicitly forbidden in ToS
 
 **Bottom line**: If you're unsure, ask permission or use an official API.
 
 ---
 
-## 📈 Performance Benchmarks
+## Performance Benchmarks
 
 Tested on typical websites with 10 workers, quality threshold 50:
 
@@ -736,7 +710,7 @@ Tested on typical websites with 10 workers, quality threshold 50:
 
 ---
 
-## 🆘 Getting Help
+## Getting Help
 
 ### Debug Checklist
 
@@ -774,7 +748,7 @@ If you found a genuine bug, open an issue on GitHub with:
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 **Built With**:
 - [DearPyGUI](https://github.com/hoffstadt/DearPyGui) - GPU-accelerated GUI framework
@@ -789,34 +763,34 @@ If you found a genuine bug, open an issue on GitHub with:
 
 ---
 
-## 📝 Changelog
+## Changelog
 
 ### v2026.05.Pro+Enhanced+ContentTypes+Codebase
 
 **Added**:
-- ✨ Codebase processing (local folders + GitHub repos)
-- ✨ RAG-style code chunking
-- ✨ Content-type specific configurations
-- ✨ Enhanced quality filtering algorithm
-- ✨ Bloom filter for memory efficiency
-- ✨ Subdomain discovery feature
-- ✨ Short high-quality content support
+- Codebase processing (local folders + GitHub repos)
+- RAG-style code chunking
+- Content-type specific configurations
+- Enhanced quality filtering algorithm
+- Bloom filter for memory efficiency
+- Subdomain discovery feature
+- Short high-quality content support
 
 **Improved**:
-- 🚀 Better HTML parsing with multiple strategies
-- 🚀 Enhanced URL normalization
-- 🚀 More robust error handling
-- 🚀 Smarter link discovery
+- Better HTML parsing with multiple strategies
+- Enhanced URL normalization
+- More robust error handling
+- Smarter link discovery
 
 **Fixed**:
-- 🐛 Relative URL handling
-- 🐛 Encoding detection
-- 🐛 Memory leaks on large crawls
-- 🐛 Rate limiting issues
+- Relative URL handling
+- Encoding detection
+- Memory leaks on large crawls
+- Rate limiting issues
 
 ---
 
-## 📄 License
+## License
 
 This tool is provided as-is for **educational and research purposes**. 
 
@@ -830,35 +804,25 @@ No warranty provided. Use at your own risk.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-Contributions welcome! Whether it's:
-
-- 🐛 Bug fixes
-- ✨ New features
-- 📖 Documentation improvements
-- 🧪 Test cases
-- 💡 Ideas and suggestions
-
-Open an issue or submit a pull request on GitHub.
+Contributions welcome. Whether it's bug fixes, new features, documentation improvements, test cases, or ideas and suggestions - open an issue or submit a pull request on GitHub.
 
 ---
 
-## ⭐ Support This Project
+## Support This Project
 
 If NTCompanion helped you build better AI models:
 
-- ⭐ Star the repo on GitHub
-- 📢 Share it with others working on fine-tuning
-- 🐛 Report bugs and suggest improvements
-- 📖 Improve documentation
-- 💬 Join discussions in Issues
+- Star the repo on GitHub
+- Share it with others working on fine-tuning
+- Report bugs and suggest improvements
+- Improve documentation
+- Join discussions in Issues
 
 ---
 
-<div align="center">
-
-**Built with 💙 for the AI community**
+**Built for the AI community**
 
 *Making fine-tuning accessible, one dataset at a time.*
 
