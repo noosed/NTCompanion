@@ -826,6 +826,5 @@ If NTCompanion helped you build better AI models:
 
 *Making fine-tuning accessible, one dataset at a time.*
 
-[⬆ Back to Top](#-ntcompanio)
 
 </div>
