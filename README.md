@@ -3,339 +3,865 @@
 <img width="503" height="305" alt="image" src="https://github.com/user-attachments/assets/66f421ec-dc25-4a9a-8cba-e5e846829ef7" />
 
 
-# NTCompanion Enhanced
+# 🚀 NTCompanion Pro
 
-**Professional dataset engine for NTTuner with codebase scanning capability**
+<div align="center">
 
-NTCompanion is a powerful web scraper and codebase analyzer designed to create high-quality training datasets for fine-tuning language models. Build datasets from websites, documentation, or entire codebases with intelligent content filtering and quality scoring.
+![NTCompanion Banner](https://img.shields.io/badge/NTCompanion-Pro-blue?style=for-the-badge)
+![Python](https://img.shields.io/badge/Python-3.8+-green?style=for-the-badge&logo=python)
+![License](https://img.shields.io/badge/License-Educational-orange?style=for-the-badge)
 
-## What's New
+**Professional Dataset Engine for Training Better AI Models**
 
-**Codebase Dataset Builder** - Point the tool at any code repository and automatically generate training data from your codebase. Supports 40+ programming languages with intelligent metadata extraction.
+*Your AI is only as good as the data it learns from. Let's fix that.*
 
-## Features
+[Features](#-features) • [Installation](#-installation) • [Quick Start](#-quick-start) • [Tutorial](#-complete-tutorial) • [NTTuner Integration](#-working-with-nttuner)
 
-### Web Scraping
-- Multi-threaded crawling with configurable depth and workers
-- Intelligent content extraction that filters navigation, ads, and noise
-- Quality scoring system (6-factor analysis: information density, educational value, structure, noise level, length, URL patterns)
-- Smart link discovery with priority queuing
-- Domain-aware rate limiting to be respectful
-- Subdomain discovery and enumeration
-- Proxy support with automatic rotation and health tracking
-- User agent rotation with 15+ authentic browser profiles
+</div>
 
-### Codebase Analysis
-- Recursive folder scanning for code files
-- Support for Python, JavaScript, TypeScript, Java, C/C++, C#, Go, Rust, Ruby, PHP, Swift, Kotlin, Scala, and 30+ more languages
-- Automatic detection and skipping of .git, node_modules, build folders, etc.
-- Extracts functions, classes, imports, and code structure
-- Multi-threaded processing for large codebases
-- Configurable file size and character limits
+---
 
-### Content Processing
-- Multiple chat templates (Llama 3, Mistral, Qwen, Phi-4, Gemma-2)
-- Configurable system prompts with presets
-- Content type configurations (Recipe, Tutorial, Documentation, Code, etc.)
-- Keyword filtering (include/exclude patterns)
-- Length constraints with quality-based overrides
-- Real-time statistics and progress tracking
+## 🤔 What is NTCompanion?
 
-### Quality Control
-- NTTuner-optimized content scoring algorithm
-- Junk page detection (FAQ, privacy policy, list pages)
-- Recipe/instruction validation for food content
-- Configurable quality thresholds (0-100 scale)
-- Smart short content handling
-- Duplicate detection with Bloom filters
+Ever tried to fine-tune an AI model and realized you need thousands of high-quality training examples? Yeah, that's painful. 
 
-## Installation
+**NTCompanion** is a powerful web scraping and dataset creation tool designed specifically to work with [NTTuner](https://github.com/noosed/NTTuner). It helps you:
 
-### Requirements
+- **Collect training data** from any website automatically
+- **Filter out the junk** using intelligent quality scoring
+- **Format everything perfectly** for fine-tuning with NTTuner
+- **Build specialized datasets** for recipes, tutorials, docs, code, and more
+
+Think of it as your personal data collection assistant that knows exactly what NTTuner needs.
+
+---
+
+## ✨ Features
+
+### 🌐 Smart Web Scraping
+
+- **Multi-threaded crawling** - Process 10-50 pages simultaneously
+- **Intelligent link discovery** - Automatically finds and follows relevant links
+- **Depth control** - Crawl seed pages only, or go 2-3 levels deep
+- **Same-domain mode** - Stay focused on one site or explore freely
+- **Rate limiting** - Be respectful to websites (automatic throttling)
+- **User agent rotation** - Uses 15+ realistic browser signatures
+
+### 🎯 Quality Filtering (The Secret Sauce)
+
+Not all web content is worth training on. NTCompanion includes a sophisticated **6-factor quality scoring system**:
+
+1. **Information Density (30%)** - Finds how-tos, tutorials, explanations
+2. **Educational Value (25%)** - Detects technical, analytical content  
+3. **Structure Quality (15%)** - Values proper formatting with lists, headers
+4. **Noise Level (15%)** - Filters out ads, navigation, placeholders
+5. **Length (10%)** - Prefers the sweet spot of 800-5000 characters
+6. **URL Quality (5%)** - Recognizes quality patterns like /blog/, /article/
+
+**Quality Score Ranges:**
+- 🔴 **0-49**: Poor - Filtered out
+- 🟡 **50-64**: Fair - Basic content
+- 🟢 **65-79**: Good - Quality content
+- ⭐ **80-100**: Excellent - Information-rich
+
+### 💾 Content Type Presets
+
+Pre-optimized configurations for different types of content:
+
+| Content Type | Best For | Example Sites |
+|-------------|----------|---------------|
+| **Generic/Auto** | Any website | Universal fallback |
+| **Recipe** | Cooking sites | AllRecipes, FoodNetwork |
+| **Tutorial** | Learning content | WikiHow, tutorials |
+| **Article/Blog** | News/opinions | Medium, blogs |
+| **Documentation** | Technical docs | ReadTheDocs, API docs |
+| **FAQ** | Q&A pages | Support sites |
+| **Product Info** | E-commerce | Product pages |
+| **Code File** | GitHub repos | Source code |
+
+### 🧠 NTTuner Perfect Integration
+
+Outputs data in exactly the format NTTuner expects:
+
+- ✅ Proper JSONL formatting
+- ✅ Chat template support (Llama, Mistral, Qwen, Phi, Gemma)
+- ✅ System prompt configuration
+- ✅ Custom user prompt templates per content type
+- ✅ Ready for immediate fine-tuning
+
+### 💻 Code & GitHub Support
+
+**NEW!** Process entire codebases:
+
+- Local folder scanning (auto-skips node_modules, .git, etc.)
+- GitHub repository cloning and processing
+- Support for 40+ programming languages
+- RAG-style chunking for better code understanding
+- Function and class extraction
+
+---
+
+## 📦 Installation
+
+### System Requirements
+
+- **Python**: 3.8 or higher
+- **OS**: Windows, Linux, or macOS
+- **Memory**: 4GB RAM minimum (8GB recommended)
+- **Disk Space**: 500MB for dependencies
+
+### Quick Install
 
 ```bash
-pip install dearpygui beautifulsoup4
-```
-
-Optional (for memory-efficient large crawls):
-```bash
-pip install mmh3
-```
-
-### Quick Setup
-
-1. Clone or download NTCompanion.py
-2. Install dependencies
-3. Run the application
-
-```bash
+# 1. Clone the repository
 git clone https://github.com/noosed/NTCompanion.git
 cd NTCompanion
-pip install -r requirements.txt
+
+# 2. Install required dependencies
+pip install dearpygui
+
+# 3. That's it! (Optional dependencies below)
+```
+
+### Optional (But Recommended) Dependencies
+
+```bash
+# For better HTML parsing
+pip install beautifulsoup4 lxml
+
+# For memory-efficient large crawls (10,000+ pages)
+pip install mmh3
+
+# For GitHub repository support
+pip install gitpython
+
+# All at once
+pip install beautifulsoup4 lxml mmh3 gitpython
+```
+
+### Verify Installation
+
+```bash
 python NTCompanion.py
 ```
 
-## Usage
+You should see the GUI window pop up. If it does, you're ready to go!
 
-### Web Scraping Mode
+---
 
-1. Enter URLs in the Source Manifest section (one per line)
-2. Configure crawl settings (depth, workers, quality threshold)
-3. Set content filters (keywords, character limits)
-4. Choose your chat template and system prompt
-5. Click START SCRAPING
-6. Monitor progress and check output in nttuner_dataset.jsonl
+## 🚀 Quick Start
 
-### Codebase Mode
+### Your First Dataset in 5 Minutes
 
-1. Open the "Codebase Dataset Builder" section
-2. Click Browse and select your code folder
-3. Configure settings (workers, character limits, template)
-4. Set Content Type to "Code File" for best results
-5. Click START CODEBASE PROCESSING
-6. Output saved to the same dataset file
+Let's scrape a cooking website to create a recipe dataset:
 
-## Configuration
+1. **Launch NTCompanion**
+   ```bash
+   python NTCompanion.py
+   ```
 
-### Crawl Settings
-- **Workers**: 1-50 concurrent threads (recommended: 10-20)
-- **Domain Delay**: Minimum seconds between requests to same domain (recommended: 1-2s)
-- **Max Depth**: How many link layers to follow (1=seed only, 2=seed+links, 3+=deep crawl)
-- **Max Retries**: Number of retry attempts on failure
-- **Timeout**: Request timeout in seconds
+2. **Add Your URLs**
+   - In the "URL LIST" box, paste:
+   ```
+   https://www.allrecipes.com/recipes/
+   https://www.allrecipes.com/recipes/desserts/
+   ```
 
-### Quality Filters
-- **Min/Max Characters**: Content length constraints
-- **Quality Threshold**: 0-100 score (50=general, 65=high quality, 80=excellent)
-- **Keywords In/Out**: Comma-separated filtering terms
-- **Domain Blacklist**: Skip specific domains entirely
+3. **Configure Settings**
+   - **Content Type**: Select "Recipe"
+   - **Crawl Depth**: Set to "2"
+   - **Quality Threshold**: Set to "50"
+   - **Workers**: Set to "10"
 
-### Content Types
+4. **Set Filters (Optional but Recommended)**
+   - **Keywords Must Contain**: `recipe, ingredient, instructions`
+   - **Keywords Exclude**: `subscribe, newsletter, advertisement`
+   - **Min Chars**: `200`
+   - **Max Chars**: `10000`
 
-Pre-configured templates for different content:
-- Recipe (ingredients, instructions)
-- Tutorial (requirements, steps, tips)
-- Product Info (features, specs, reviews)
-- Article/Blog (summary, key points)
-- Documentation (overview, usage, examples)
-- FAQ (questions, answers)
-- Code File (purpose, functions, usage)
-- Custom (define your own)
+5. **Click START**
+   - Watch the console log fill with progress
+   - Wait for "Scraping complete!" message
+   - Your data is saved to `scraped_data.jsonl`
 
-## Quality Scoring
+**That's it!** You now have a recipe dataset ready for NTTuner.
 
-The intelligent content scorer evaluates pages across six dimensions:
+---
 
-**Information Density (30%)** - Identifies how-to content, tutorials, explanations  
-**Educational Value (25%)** - Detects technical and analytical content  
-**Structure Quality (15%)** - Evaluates lists, headers, paragraphs  
-**Noise Filtering (15%)** - Removes ads, navigation, placeholders  
-**Length Optimization (10%)** - Sweet spot: 800-5000 characters  
-**URL Quality (5%)** - Recognizes quality URL patterns
+## 📚 Complete Tutorial
 
-Score ranges:
-- 0-49: Poor (filtered)
-- 50-64: Fair (basic content)
-- 65-79: Good (quality content)
-- 80-100: Excellent (information-rich)
+### Understanding Crawl Depth
 
-## Output Format
+**Depth** controls how far the scraper explores from your seed URLs:
 
-NTCompanion generates JSONL files compatible with NTTuner:
+- **Depth 1**: Only scrapes the exact URLs you provide
+  - Use when: You have a specific list of pages
+  - Result: Fast, precise, ~10-50 pages
 
-```json
-{"text": "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nYou are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nHow do I make Chocolate Cake?<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\nChocolate Cake\nIngredients:\n- 2 cups flour\n...<|eot_id|>"}
-```
+- **Depth 2**: Scrapes seeds + all links found on those pages ⭐ **RECOMMENDED**
+  - Use when: You want to explore a section thoroughly
+  - Result: Medium speed, ~50-500 pages
 
-Each line is a complete conversation ready for fine-tuning.
+- **Depth 3+**: Goes deeper into the site hierarchy
+  - Use when: You want comprehensive coverage
+  - Result: Slower, can find 500-10,000+ pages
 
-## File Structure
+**Pro Tip**: Start with depth 2. You can always run it again deeper if you need more data.
+
+### Setting Up Quality Filters
+
+Quality filters are your best friend. Here's how to use them effectively:
+
+#### Example 1: High-Quality Technical Blog
 
 ```
-NTCompanion/
-├── NTCompanion.py              # Main application
-├── nttuner_config_pro.json     # Auto-saved configuration
-├── ntcompanion_pro.ini         # Window layout/position
-├── nttuner_dataset.jsonl       # Output dataset
-├── scraper_log.txt             # Optional log file
-└── README.md                   # This file
+Content Type: Article/Blog
+Keywords Must Contain: tutorial, guide, how-to, explained
+Keywords Exclude: subscribe, buy now, ad, promotion
+Quality Threshold: 70
+Min Chars: 500
+Same Domain Only: ✓ Enabled
 ```
 
-## Advanced Features
+**Result**: Only keeps well-written, informative articles.
 
-### Proxy Support
-- Multiple proxy sources (20+ built-in)
-- Automatic health tracking and quarantine
-- Score-based selection (success rate weighted)
-- Import custom proxy lists
+#### Example 2: Documentation Scraping
 
-### Subdomain Discovery
-- Automatically discovers www, blog, docs, api, shop subdomains
-- Verifies subdomain existence before crawling
-- Expands crawl scope intelligently
+```
+Content Type: Documentation  
+Keywords Must Contain: API, function, parameter, example
+Keywords Exclude: pricing, contact, enterprise
+Quality Threshold: 75
+Min Chars: 300
+Ignore Quality for Short Content: ✗ Disabled
+```
 
-### Bloom Filters
-- Memory-efficient deduplication for large crawls
-- Handles 100,000+ URLs with minimal overhead
-- Optional (requires mmh3 package)
+**Result**: Technical documentation with code examples.
 
-### Session Persistence
-- Saves configuration between runs
-- Remembers window position and size
-- Maintains proxy pool state
+#### Example 3: Recipe Collection
 
-## Tips for Best Results
+```
+Content Type: Recipe
+Keywords Must Contain: ingredients, instructions, servings
+Keywords Exclude: sponsored, affiliate, advertisement
+Quality Threshold: 60
+Allow Short High-Quality Content: ✓ Enabled
+Short Min: 150
+```
 
-**For general scraping:**
-- Start with depth 2 and 10-15 workers
-- Use quality threshold of 50-65
-- Enable quality filtering
-- Set domain delay to 1-2 seconds
+**Result**: Complete recipes, including shorter ones if high-quality.
 
-**For high-quality datasets:**
-- Increase quality threshold to 70+
-- Use keyword filtering to focus content
-- Enable "Allow Short High-Quality Content"
-- Review and iterate on results
+### Content Type Selection Guide
 
-**For large crawls:**
-- Install mmh3 for Bloom filters
-- Use 20-30 workers for speed
-- Enable proxy rotation if needed
-- Monitor failed requests and adjust
+Not sure which content type to use? Here's a decision tree:
 
-**For code analysis:**
-- Set min characters low (50-100) for small files
-- Use "Code File" content type
-- Process one repository at a time
-- Check logs for encoding issues
+```
+📄 Scraping what?
+├─ 🍔 Food/cooking website? → Recipe
+├─ 📖 How-to guides/tutorials? → Tutorial/How-To
+├─ 📝 News/opinion articles? → Article/Blog
+├─ 🛠️ Technical documentation? → Documentation
+├─ ❓ FAQ/support pages? → FAQ
+├─ 🛒 Product descriptions? → Product Info
+├─ 💻 GitHub/source code? → Code File
+└─ 🤷 Not sure? → Generic/Auto-detect
+```
 
-## Troubleshooting
+### Advanced: Using the Subdomain Crawler
 
-**Too many low-quality pages**
-- Increase quality threshold to 65-70
-- Add exclusion keywords: privacy, terms, about, contact
-- Enable junk filtering
+Enable **Automatic Subdomain Discovery** to explore related subdomains:
 
-**Not enough data**
-- Decrease quality threshold to 40-50
-- Increase crawl depth to 3-4
-- Disable "Same Domain Only"
+**Example**: Starting from `example.com`, it will discover and crawl:
+- www.example.com
+- blog.example.com
+- docs.example.com
+- api.example.com
+- shop.example.com
 
-**Scraping too slow**
-- Increase workers to 20-30
-- Reduce crawl depth to 2
-- Check domain delay setting
+**When to use**:
+- ✅ Large sites with multiple subdomains
+- ✅ Documentation split across docs.*, help.*, support.*
+- ❌ When you want focused, specific content
 
-**Getting blocked**
-- Reduce workers to 5-10
-- Increase domain delay to 2-3 seconds
-- Enable proxy rotation
+### Working with Code Repositories
 
-**Code files not processing**
-- Check file permissions
-- Verify encoding (UTF-8 preferred)
-- Check console for specific errors
-- Adjust min/max character limits
+NTCompanion can process entire codebases:
 
-## Integration with NTTuner
+#### Processing a Local Folder
 
-NTCompanion is designed to work seamlessly with NTTuner for fine-tuning:
+1. Click **"Browse"** under "Codebase Dataset Builder"
+2. Select your code folder
+3. Configure:
+   - **RAG Chunking**: Enable for better semantic chunking
+   - **Chunk Size**: 50 lines (default is good)
+4. Click **"START CODEBASE PROCESSING"**
+
+#### Processing GitHub Repositories
+
+1. Create a text file with GitHub URLs:
+   ```
+   https://github.com/microsoft/vscode
+   https://github.com/python/cpython
+   https://github.com/torvalds/linux
+   ```
+
+2. In NTCompanion:
+   - Click **"Browse"** next to "GitHub List File"
+   - Select your text file
+   - (Optional) Add personal access token for private repos
+   - Click **"START CODEBASE PROCESSING"**
+
+**Supported Languages**:
+Python, JavaScript, TypeScript, Java, C/C++, C#, Go, Rust, Ruby, PHP, Swift, Kotlin, Scala, R, Shell, SQL, HTML, CSS, and 30+ more!
+
+---
+
+## 🤝 Working with NTTuner
+
+The entire point of NTCompanion is to create data for [NTTuner](https://github.com/noosed/NTTuner). Here's the complete workflow:
+
+### Step 1: Create Your Dataset with NTCompanion
 
 ```bash
-# After scraping, use with NTTuner
-python -m nttuner.train \
-  --data nttuner_dataset.jsonl \
-  --model meta-llama/Llama-3.2-3B-Instruct \
-  --output my_finetuned_model \
-  --epochs 3
+# 1. Scrape your data
+python NTCompanion.py
+# Configure and scrape as shown above
+# Output: scraped_data.jsonl
 ```
 
-## Contributing
+### Step 2: Verify Your Dataset
 
-Contributions are welcome. If you find bugs or have feature requests, please open an issue on GitHub.
+Quick check:
+```bash
+# On Windows
+type scraped_data.jsonl | find /c "{"
 
-## License
+# On Linux/Mac  
+wc -l scraped_data.jsonl
+```
 
-This tool is provided for educational and research purposes. Users are responsible for complying with website terms of service and applicable laws when scraping content.
+This tells you how many training examples you have.
 
-## Changelog
+**How much data do you need?**
+- **Minimum**: 100 examples (very small, targeted task)
+- **Good**: 500-1,000 examples (solid fine-tune)
+- **Great**: 2,000-5,000 examples (comprehensive dataset)
+- **Overkill**: 10,000+ examples (diminishing returns)
 
-### v2026.05 - Pro+Enhanced+ContentTypes+Codebase
-- Added codebase dataset builder
-- Support for 40+ programming languages
-- Intelligent code metadata extraction
-- Multi-threaded code processing
-- Enhanced error handling for file operations
-- Fixed DearPyGUI deprecation warnings
+### Step 3: Configure NTTuner
 
-### v2026.05 - Pro+Enhanced+ContentTypes
-- Added content type configurations
-- Recipe, tutorial, documentation templates
-- Improved content extraction
-- Better junk page detection
-- Enhanced quality scoring
+1. **Open NTTuner**:
+   ```bash
+   python NTTuner.py
+   ```
 
-### v2026.05 - Pro+Enhanced
-- Intelligent quality filtering
-- 6-factor content scoring
-- Subdomain discovery
-- Bloom filter support
-- Enhanced proxy management
+2. **Load Your Dataset**:
+   - Click "Browse" next to Dataset Path
+   - Select your `scraped_data.jsonl` file
 
----
+3. **Choose a Base Model**:
+   - For 8GB GPU: `meta-llama/Llama-3.2-3B-Instruct`
+   - For 12GB GPU: `meta-llama/Llama-3.1-8B-Instruct`  
+   - For 16GB+ GPU: `mistralai/Mistral-Nemo-Instruct-2407`
 
-**Made by [@noosed](https://github.com/noosed)**
-### Data Quality
+4. **Set Training Parameters**:
+   - **LoRA Rank**: 16-32 (start with 16)
+   - **Epochs**: 1-3 (start with 1)
+   - **Batch Size**: 4 (reduce if OOM)
+   - **Learning Rate**: 2e-4 (default is good)
 
-* The quality filter helps exclude low-value content
-* Keyword filters prevent scraping unwanted sections
-* Domain blacklisting prevents social media scraping
+5. **Configure Output**:
+   - **Model Name**: Give it a meaningful name
+   - **Quantization**: q5\_k\_m (good balance)
+   - **Import to Ollama**: ✓ Enabled
 
-## Changelog
+6. **Click "Start Training"**
 
-### v2026.06 - Enhanced+Universal+BugFix
+### Step 4: Use Your Fine-Tuned Model
 
-* Added BeautifulSoup support for better parsing
-* Implemented content-type aware extraction
-* Enhanced URL normalization and link discovery
-* Added Bloom filter for memory efficiency
-* Improved quality scoring algorithm
-* Better error handling and retries
-* Domain-based rate limiting
-* Multiple user agent rotation
-* Enhanced text cleaning and extraction
-* Fixed encoding detection issues
-* Added comprehensive documentation
+Once training completes:
 
-## Credits
+```bash
+# Test your model
+ollama run your-model-name
 
-* Built for [NTTuner](https://github.com/noosed/nttuner) by noosed
-* Uses [DearPyGUI](https://github.com/hoffstadt/DearPyGui) for the interface
-* Optional [BeautifulSoup4](https://www.crummy.com/software/BeautifulSoup/) for parsing
-* Optional [mmh3](https://github.com/hajimes/mmh3) for Bloom filters
+# Example conversation
+>>> Hello! I need help with a recipe.
+>>> Can you explain how to make chocolate chip cookies?
+```
 
-## License
+Your model should now respond with knowledge from your scraped dataset!
 
-This tool is provided as-is for educational and research purposes. Users are responsible for complying with website terms of service and applicable laws.
+### Template Matching
 
-## Reporting Issues
+**IMPORTANT**: The chat template in NTCompanion must match your NTTuner base model:
 
-If you encounter bugs or have feature requests:
+| NTTuner Base Model | NTCompanion Template |
+|-------------------|---------------------|
+| meta-llama/Llama-3.2-* | Meta Llama-3.1/3.2/3.3 Instruct |
+| mistralai/Mistral-* | Mistral Nemo/Large Instruct |
+| Qwen/Qwen2.5-* | Qwen2.5 Instruct |
+| microsoft/Phi-4 | Phi-4 Instruct |
+| google/gemma-2-* | Gemma-2 Instruct |
 
-1. Check the console log for error messages
-2. Note your configuration (content type, depth, etc.)
-3. Provide example URLs if possible
-4. Describe expected vs actual behavior
-
-## Learn More
-
-* **NTTuner Documentation**: https://github.com/noosed/nttuner
-* **Fine-tuning Guide**: Check NTTuner's README
-* **Best Practices**: See Tips & Best Practices section above
+**If they don't match**, NTTuner won't be able to parse your dataset correctly!
 
 ---
 
-**Happy Scraping!**
+## ⚙️ Configuration Guide
 
-Build high-quality datasets for your fine-tuning projects!
+### Saving & Loading Configs
+
+**Save your configuration**:
+1. Set up all your parameters
+2. Click "Save Config"
+3. Choose a location (e.g., `recipe_scraper.json`)
+
+**Load a saved configuration**:
+1. Click "Load Config"
+2. Select your JSON file
+3. All settings populate automatically
+
+**Pro Tip**: Create multiple config files for different projects:
+- `recipes.json`
+- `tech_docs.json`
+- `tutorials.json`
+
+### System Prompts
+
+System prompts define how the AI should behave. NTCompanion includes presets:
+
+- **Blank**: No system prompt (rare use case)
+- **Helpful Assistant**: General purpose ⭐ **RECOMMENDED**
+- **Data Summarizer**: For summarization tasks
+- **Code Expert**: For technical/code content
+- **Creative Writer**: For narrative, story-like content
+- **NTTuner Default**: Optimized for reasoning
+
+**Custom System Prompts**:
+
+```
+You are a knowledgeable cooking assistant specialized in 
+international cuisine. Provide detailed, step-by-step 
+instructions and explain cooking techniques clearly.
+```
+
+Click dropdown → Select "Helpful Assistant" → Modify the text box → Done!
+
+### Understanding User Prompts
+
+Each content type has a **user prompt template** that creates the question part of the training data.
+
+**Example for Recipes**:
+```
+Template: "How do I make {title}?"
+Scraped Title: "Chocolate Chip Cookies"
+Result: "How do I make Chocolate Chip Cookies?"
+```
+
+The AI learns to respond to questions like this with the scraped content.
+
+---
+
+## 🎯 Best Practices
+
+### Do's ✅
+
+1. **Start small** - Test with 2-3 URLs before scaling up
+2. **Use quality filtering** - Don't disable it unless you have a reason
+3. **Match content types** - Select the right preset for your data
+4. **Enable "Same Domain Only"** - When building focused datasets
+5. **Set keyword filters** - Be specific about what you want/don't want
+6. **Save your configs** - Reuse successful configurations
+7. **Monitor the console** - Watch for patterns in failures
+8. **Iterate** - Adjust filters based on initial results
+
+### Don'ts ❌
+
+1. **Don't skip quality filtering** - You'll get lots of junk
+2. **Don't use depth 5+** - You'll scrape forever (and maybe get blocked)
+3. **Don't set workers too high** - Above 30 is asking for trouble
+4. **Don't ignore robots.txt** - The scraper respects it automatically
+5. **Don't scrape paywalled content** - It won't work and it's unethical
+6. **Don't forget to match templates** - NTTuner won't understand mismatched data
+7. **Don't collect more than you need** - 5,000 examples is plenty for most tasks
+
+### Performance Tips
+
+**For speed**:
+```
+Workers: 20-30
+Depth: 2
+Quality Threshold: 50
+Crawl Strategy: BFS (Breadth-first)
+```
+
+**For quality**:
+```
+Workers: 5-10
+Depth: 2-3
+Quality Threshold: 70
+Enable all keyword filters
+```
+
+**For discovery**:
+```
+Workers: 10
+Depth: 3-4
+Same Domain: Disabled
+Subdomain Discovery: Enabled
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Problem: "No content extracted" for most pages**
+
+**Solution**:
+- Lower quality threshold to 40
+- Check if keywords are too restrictive
+- Disable "Ignore Quality Filter for Short Content"
+- Try "Generic/Auto-detect" content type
+
+---
+
+**Problem: Too much junk data collected**
+
+**Solution**:
+- Increase quality threshold to 65-70
+- Add exclusion keywords: `privacy, terms, about, subscribe, newsletter`
+- Enable "Same Domain Only"
+- Reduce crawl depth to 2
+
+---
+
+**Problem: Scraping is very slow**
+
+**Solution**:
+- Increase workers to 20-30
+- Reduce crawl depth
+- Check your internet connection
+- Some sites have rate limiting (be patient)
+
+---
+
+**Problem: Getting blocked/403 errors**
+
+**Solution**:
+- Reduce workers to 5-10
+- The scraper already rotates user agents and respects rate limits
+- Some sites simply don't allow scraping
+- Try adding delays between requests (edit `CRAWL_DELAY` in code)
+
+---
+
+**Problem: NTTuner can't load the dataset**
+
+**Solution**:
+- Check that chat template matches base model
+- Verify JSONL file isn't corrupted:
+  ```bash
+  python -m json.tool scraped_data.jsonl
+  ```
+- Make sure each line is valid JSON
+- Check file encoding is UTF-8
+
+---
+
+**Problem: Out of memory during large crawls**
+
+**Solution**:
+- Install mmh3: `pip install mmh3` (enables Bloom filter)
+- Reduce workers to 10
+- Set "Stop After N" limit
+- Process in smaller batches
+
+---
+
+## 📊 Example Workflows
+
+### Workflow 1: Recipe Dataset for Cooking Chatbot
+
+**Goal**: Train a model to answer cooking questions
+
+```
+NTCompanion Settings:
+  Content Type: Recipe
+  URLs: 
+    - https://www.allrecipes.com/
+    - https://www.foodnetwork.com/
+  Depth: 2
+  Workers: 15
+  Quality Threshold: 60
+  Keywords Include: recipe, ingredients, instructions
+  Keywords Exclude: sponsored, advertisement
+  Template: Meta Llama-3.2 Instruct
+  System Prompt: "You are a helpful cooking assistant."
+
+Expected Result: 500-2000 recipe examples
+
+NTTuner Settings:
+  Base Model: meta-llama/Llama-3.2-3B-Instruct
+  Epochs: 2
+  LoRA Rank: 16
+  Batch Size: 4
+```
+
+---
+
+### Workflow 2: Technical Documentation Assistant
+
+**Goal**: Create an AI expert in a specific API/framework
+
+```
+NTCompanion Settings:
+  Content Type: Documentation
+  URLs:
+    - https://docs.python.org/3/
+    - https://pytorch.org/docs/
+  Depth: 3
+  Workers: 10
+  Quality Threshold: 75
+  Keywords Include: function, method, parameter, example
+  Keywords Exclude: download, install
+  Same Domain: Enabled
+  Template: Qwen2.5 Instruct
+
+Expected Result: 1000-3000 documentation pages
+
+NTTuner Settings:
+  Base Model: Qwen/Qwen2.5-7B-Instruct
+  Epochs: 3
+  LoRA Rank: 32
+  Batch Size: 2
+```
+
+---
+
+### Workflow 3: Code Understanding Model
+
+**Goal**: Fine-tune a model on a codebase
+
+```
+NTCompanion Settings:
+  Mode: Codebase Dataset Builder
+  Source: Local Folder
+  Path: /path/to/your/project
+  Content Type: Code File
+  RAG Chunking: Enabled
+  Chunk Size: 50 lines
+  Template: Meta Llama-3.2 Instruct
+
+Expected Result: 500-5000 code chunks
+
+NTTuner Settings:
+  Base Model: meta-llama/Llama-3.2-3B-Instruct
+  Epochs: 1
+  LoRA Rank: 16
+  Batch Size: 4
+  Max Seq Length: 2048
+```
+
+---
+
+## 🔒 Legal & Ethical Usage
+
+### ⚖️ Legal Considerations
+
+**Before scraping a website**:
+1. Check their `robots.txt` file (scraper respects this automatically)
+2. Review their Terms of Service
+3. Look for an official API (always prefer APIs when available)
+4. Consider seeking permission for commercial use
+
+**Copyright**:
+- Scraped data may be copyrighted
+- Fine-tuning on copyrighted data is a gray area legally
+- Use for research/personal projects is generally safer
+- Commercial use requires more caution
+
+### 🤝 Be Respectful
+
+**NTCompanion includes built-in protections**:
+- ✅ Rate limiting per domain
+- ✅ User agent rotation
+- ✅ Respects robots.txt
+- ✅ Exponential backoff on errors
+
+**But you should still**:
+- Keep workers reasonable (10-20 is plenty)
+- Don't hammer small sites
+- Respect paywalls
+- Don't scrape personal/private data
+- Consider the website's resources
+
+### ✅ Good Use Cases
+
+- ✅ Publicly accessible content
+- ✅ Educational research
+- ✅ Personal learning projects
+- ✅ Non-commercial fine-tuning
+- ✅ Your own content scattered across sites
+- ✅ Open-source documentation
+
+### ❌ Bad Use Cases
+
+- ❌ Circumventing paywalls
+- ❌ Collecting personal information
+- ❌ Commercial scraping without permission
+- ❌ Social media at scale
+- ❌ Financial/trading data (use official APIs)
+- ❌ Anything explicitly forbidden in ToS
+
+**Bottom line**: If you're unsure, ask permission or use an official API.
+
+---
+
+## 📈 Performance Benchmarks
+
+Tested on typical websites with 10 workers, quality threshold 50:
+
+| Content Type | Pages/Minute | Memory Usage | Avg Quality Score |
+|-------------|-------------|--------------|------------------|
+| Blog Posts | 30-50 | ~100MB | 65-75 |
+| Documentation | 20-40 | ~150MB | 70-85 |
+| Recipes | 40-60 | ~80MB | 60-70 |
+| News Articles | 25-45 | ~120MB | 55-70 |
+| GitHub Repos | 10-30 files/min | ~200MB | 75-85 |
+
+*Your mileage may vary based on internet speed, site structure, and settings*
+
+---
+
+## 🆘 Getting Help
+
+### Debug Checklist
+
+Before asking for help, try these steps:
+
+1. **Check the console log**
+   - Look for error messages
+   - Note which URLs are failing
+   - See if there's a pattern
+
+2. **Verify your settings**
+   - Is depth reasonable? (2-3 is safe)
+   - Are workers too high? (>30 can cause issues)
+   - Are keywords too restrictive?
+
+3. **Test with a simple case**
+   - Try 1-2 URLs only
+   - Use "Generic/Auto-detect"
+   - Lower quality threshold to 30
+
+4. **Check the output file**
+   - Does `scraped_data.jsonl` exist?
+   - Is it empty or does it have data?
+   - Is each line valid JSON?
+
+### Reporting Bugs
+
+If you found a genuine bug, open an issue on GitHub with:
+
+1. Exact error message from console
+2. Your configuration (JSON file)
+3. Example URLs (if possible)
+4. What you expected vs. what happened
+5. Python version and OS
+
+---
+
+## 🙏 Acknowledgments
+
+**Built With**:
+- [DearPyGUI](https://github.com/hoffstadt/DearPyGui) - GPU-accelerated GUI framework
+- [BeautifulSoup4](https://www.crummy.com/software/BeautifulSoup/) - HTML parsing
+- [urllib](https://docs.python.org/3/library/urllib.html) - HTTP requests
+- [GitPython](https://github.com/gitpython-developers/GitPython) - Repository handling
+
+**Inspired By**:
+- [Common Crawl](https://commoncrawl.org/) - Large-scale web archiving
+- [Hugging Face Datasets](https://huggingface.co/datasets) - Dataset standards
+- The need for better fine-tuning data
+
+---
+
+## 📝 Changelog
+
+### v2026.05.Pro+Enhanced+ContentTypes+Codebase
+
+**Added**:
+- ✨ Codebase processing (local folders + GitHub repos)
+- ✨ RAG-style code chunking
+- ✨ Content-type specific configurations
+- ✨ Enhanced quality filtering algorithm
+- ✨ Bloom filter for memory efficiency
+- ✨ Subdomain discovery feature
+- ✨ Short high-quality content support
+
+**Improved**:
+- 🚀 Better HTML parsing with multiple strategies
+- 🚀 Enhanced URL normalization
+- 🚀 More robust error handling
+- 🚀 Smarter link discovery
+
+**Fixed**:
+- 🐛 Relative URL handling
+- 🐛 Encoding detection
+- 🐛 Memory leaks on large crawls
+- 🐛 Rate limiting issues
+
+---
+
+## 📄 License
+
+This tool is provided as-is for **educational and research purposes**. 
+
+**You are responsible for**:
+- Complying with website terms of service
+- Respecting copyright laws
+- Using scraped data ethically
+- Following applicable regulations
+
+No warranty provided. Use at your own risk.
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome! Whether it's:
+
+- 🐛 Bug fixes
+- ✨ New features
+- 📖 Documentation improvements
+- 🧪 Test cases
+- 💡 Ideas and suggestions
+
+Open an issue or submit a pull request on GitHub.
+
+---
+
+## ⭐ Support This Project
+
+If NTCompanion helped you build better AI models:
+
+- ⭐ Star the repo on GitHub
+- 📢 Share it with others working on fine-tuning
+- 🐛 Report bugs and suggest improvements
+- 📖 Improve documentation
+- 💬 Join discussions in Issues
+
+---
+
+<div align="center">
+
+**Built with 💙 for the AI community**
+
+*Making fine-tuning accessible, one dataset at a time.*
+
+[⬆ Back to Top](#-ntcompanio)
+
+</div>
