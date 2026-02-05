@@ -3869,8 +3869,8 @@ with dpg.window(tag="PrimaryWindow"):
     dpg.add_progress_bar(tag="progress_bar", label="IDLE", width=-1, height=18)
     dpg.add_spacer(height=8)
     dpg.add_text("Console:")
-    with dpg.child_window(tag="log_group", height=-35, border=True):
-        dpg.add_text("", tag="log_text", wrap=0)
+    with dpg.child_window(tag="log_group", height=150, border=True, horizontal_scrollbar=True):
+        dpg.add_text("", tag="log_text", wrap=-1)
 
     dpg.add_separator()
     dpg.add_text(f"NTCompanion Pro | {VERSION}", color=[50, 50, 60])
