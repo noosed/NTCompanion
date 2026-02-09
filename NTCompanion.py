@@ -6,7 +6,6 @@ import threading
 import urllib.request
 import urllib.parse
 import ssl
-from pathlib import Path
 import re
 import random
 import tkinter as tk
@@ -18,7 +17,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import shutil
 import tempfile
 import subprocess
-from pathlib import Path  # FIX: Added missing import
 
 # GitHub repository support
 try:
@@ -57,7 +55,7 @@ except ImportError:
 # ================================================================
 CONFIG_FILE = "nttuner_config_pro.json"
 INI_FILE = "ntcompanion_pro.ini"
-VERSION = "build.2026.05.Pro+Enhanced+ContentTypes+Codebase"
+VERSION = "build.2026.05"
 MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB
 
 # GitHub repository processing - CODEBASE FEATURE
@@ -549,547 +547,6 @@ crawl_queue = CrawlQueue()
 # ================================================================
 # CODEBASE SCANNER - NEW FEATURE
 # ================================================================
-
-# ================================================================
-# GITHUB REPOSITORY PROCESSING - CODEBASE FEATURE
-# ================================================================
-
-def parse_github_url(url_line: str) -> Optional[Tuple[str, Optional[str]]]:
-    """
-    Parse GitHub URL with optional branch.
-    Returns (url, branch) or None if invalid.
-
-    Supports:
-    - https://github.com/user/repo
-    - https://github.com/user/repo.git
-    - https://github.com/user/repo@branch
-    - https://github.com/user/repo.git@branch
-    """
-    url_line = url_line.strip()
-    if not url_line or url_line.startswith('#'):
-        return None
-
-    # Extract branch if present
-    branch = None
-    if '@' in url_line:
-        url_line, branch = url_line.rsplit('@', 1)
-        branch = branch.strip()
-
-    # Validate GitHub URL
-    if not ('github.com' in url_line or 'github.com/' in url_line):
-        return None
-
-    # Ensure .git extension
-    if not url_line.endswith('.git'):
-        url_line = url_line.rstrip('/') + '.git'
-
-    return (url_line, branch)
-
-
-def clone_github_repo(url: str, branch: Optional[str], token: Optional[str],
-                      temp_dir: Path, timeout: int = GITHUB_CLONE_TIMEOUT) -> Optional[Path]:
-    """
-    Clone a GitHub repository.
-    Returns path to cloned repo or None if failed.
-    """
-    global stop_requested
-
-    try:
-        # Create unique clone directory
-        repo_name = url.split('/')[-1].replace('.git', '')
-        clone_path = temp_dir / repo_name
-
-        if clone_path.exists():
-            shutil.rmtree(clone_path)
-
-        # Add token to URL if provided
-        clone_url = url
-        if token:
-            # Insert token: https://TOKEN@github.com/...
-            if 'https://' in url:
-                clone_url = url.replace('https://', f'https://{token}@')
-
-        log(f"Cloning {repo_name}...")
-
-        if HAS_GITPYTHON:
-            # Use gitpython
-            try:
-                if branch:
-                    git.Repo.clone_from(clone_url, clone_path, branch=branch, depth=1)
-                else:
-                    git.Repo.clone_from(clone_url, clone_path, depth=1)
-            except Exception as e:
-                log(f"  ✗ Clone failed: {e}", [255, 100, 100])
-                return None
-        else:
-            # Fallback to subprocess
-            cmd = ['git', 'clone', '--depth', '1']
-            if branch:
-                cmd.extend(['--branch', branch])
-            cmd.extend([clone_url, str(clone_path)])
-
-            try:
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    check=False
-                )
-
-                if result.returncode != 0:
-                    log(f"  ✗ Clone failed: {result.stderr}", [255, 100, 100])
-                    return None
-            except subprocess.TimeoutExpired:
-                log(f"  ✗ Clone timeout after {timeout}s", [255, 100, 100])
-                return None
-            except FileNotFoundError:
-                log(f"  ✗ git command not found - install git or gitpython", [255, 100, 100])
-                return None
-
-        # Check repo size
-        repo_size_mb = sum(f.stat().st_size for f in clone_path.rglob('*') if f.is_file()) / (1024 * 1024)
-        if repo_size_mb > MAX_REPO_SIZE_MB:
-            log(f"  ⚠️  Repo too large ({repo_size_mb:.1f}MB > {MAX_REPO_SIZE_MB}MB), skipping", [255, 150, 100])
-            shutil.rmtree(clone_path)
-            return None
-
-        log(f"  ✓ Cloned successfully ({repo_size_mb:.1f}MB)", [0, 255, 150])
-        return clone_path
-
-    except Exception as e:
-        log(f"  ✗ Unexpected error: {e}", [255, 100, 100])
-        return None
-
-
-def process_single_github_repo(url: str, branch: Optional[str], token: Optional[str],
-                               temp_dir: Path, config: dict) -> dict:
-    """
-    Process a single GitHub repository.
-    Returns dict with stats: repos_cloned, files_processed, files_failed
-    """
-    global stop_requested
-
-    result = {
-        "repos_cloned": 0,
-        "repos_failed": 0,
-        "files_processed": 0,
-        "files_failed": 0,
-        "total_chars": 0
-    }
-
-    if stop_requested:
-        return result
-
-    # Clone the repository
-    clone_path = clone_github_repo(url, branch, token, temp_dir)
-    if not clone_path:
-        result["repos_failed"] = 1
-        return result
-
-    result["repos_cloned"] = 1
-
-    try:
-        # Scan and process the cloned repository
-        code_files = scan_codebase_folder(str(clone_path))
-        log(f"  Found {len(code_files)} code files in {clone_path.name}", [100, 200, 255])
-
-        # Process each file
-        for full_path, rel_path in code_files:
-            if stop_requested:
-                break
-
-            try:
-                file_result = process_code_file(full_path, rel_path, config)
-
-                if file_result.get('success'):
-                    result["files_processed"] += 1
-                    result["total_chars"] += file_result.get('chars', 0)
-                else:
-                    result["files_failed"] += 1
-
-            except Exception as e:
-                log(f"  Error processing {rel_path}: {e}", [255, 150, 100])
-                result["files_failed"] += 1
-
-    except Exception as e:
-        log(f"  ✗ Error processing repo: {e}", [255, 100, 100])
-        result["repos_failed"] = 1
-    finally:
-        # Remove cloned repo to save space
-        if clone_path.exists():
-            try:
-                shutil.rmtree(clone_path)
-            except Exception:
-                pass
-
-    return result
-
-
-def process_github_repos(github_list_path: str, token: Optional[str], config: dict):
-    """
-    Main function to process GitHub repositories from a list file.
-    Updates global stats dictionary.
-    """
-    global stop_requested, stats
-
-    # Validate list file
-    if not Path(github_list_path).exists():
-        log(f"✗ GitHub list file not found: {github_list_path}", [255, 100, 100])
-        return
-
-    # Parse repository URLs
-    with open(github_list_path, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-
-    repo_specs = []
-    for line in lines:
-        parsed = parse_github_url(line)
-        if parsed:
-            repo_specs.append(parsed)
-
-    if not repo_specs:
-        log("✗ No valid GitHub URLs found in list file", [255, 100, 100])
-        return
-
-    log(f"Found {len(repo_specs)} repositories to process", [100, 200, 255])
-
-    # Add GitHub-specific stats if they don't exist
-    if "repos_total" not in stats:
-        stats["repos_total"] = 0
-        stats["repos_cloned"] = 0
-        stats["repos_failed"] = 0
-
-    stats["repos_total"] = len(repo_specs)
-
-    # Create temporary directory for clones
-    temp_dir = Path(tempfile.mkdtemp(prefix='ntc_github_'))
-    log(f"Using temp directory: {temp_dir}", [150, 150, 160])
-
-    try:
-        start_time = time.time()
-
-        # Process repos with concurrency limit
-        with ThreadPoolExecutor(max_workers=CONCURRENT_REPO_CLONES) as executor:
-            futures = {}
-
-            for url, branch in repo_specs:
-                if stop_requested:
-                    break
-
-                future = executor.submit(
-                    process_single_github_repo,
-                    url, branch, token, temp_dir, config
-                )
-                futures[future] = (url, branch)
-
-            # Collect results
-            for future in as_completed(futures):
-                if stop_requested:
-                    future.cancel()
-                    continue
-
-                try:
-                    result = future.result()
-
-                    # Update global stats
-                    stats["repos_cloned"] += result["repos_cloned"]
-                    stats["repos_failed"] += result["repos_failed"]
-                    stats["success"] += result["files_processed"]
-                    stats["failed"] += result["files_failed"]
-                    stats["total_chars"] += result["total_chars"]
-
-                    # Update UI
-                    update_stats_ui()
-
-                except Exception as e:
-                    log(f"Repository processing error: {e}", [255, 100, 100])
-                    stats["repos_failed"] += 1
-
-        elapsed = time.time() - start_time
-        log(f"✅ GitHub processing complete: {stats['repos_cloned']}/{stats['repos_total']} repos cloned in {elapsed:.1f}s",
-            [0, 255, 200])
-
-    finally:
-        # Cleanup temp directory
-        if temp_dir.exists():
-            try:
-                shutil.rmtree(temp_dir)
-                log(f"Cleaned up temp directory", [150, 150, 160])
-            except Exception as e:
-                log(f"⚠️  Could not remove temp dir: {e}", [255, 150, 100])
-
-
-# ================================================================
-# GITHUB REPOSITORY PROCESSING - CODEBASE FEATURE
-# ================================================================
-
-def parse_github_url(url_line: str) -> Optional[Tuple[str, Optional[str]]]:
-    """
-    Parse GitHub URL with optional branch.
-    Returns (url, branch) or None if invalid.
-
-    Supports:
-    - https://github.com/user/repo
-    - https://github.com/user/repo.git
-    - https://github.com/user/repo@branch
-    - https://github.com/user/repo.git@branch
-    """
-    url_line = url_line.strip()
-    if not url_line or url_line.startswith('#'):
-        return None
-
-    # Extract branch if present
-    branch = None
-    if '@' in url_line:
-        url_line, branch = url_line.rsplit('@', 1)
-        branch = branch.strip()
-
-    # Validate GitHub URL
-    if not ('github.com' in url_line or 'github.com/' in url_line):
-        return None
-
-    # Ensure .git extension
-    if not url_line.endswith('.git'):
-        url_line = url_line.rstrip('/') + '.git'
-
-    return (url_line, branch)
-
-
-def clone_github_repo(url: str, branch: Optional[str], token: Optional[str],
-                      temp_dir: Path, timeout: int = GITHUB_CLONE_TIMEOUT) -> Optional[Path]:
-    """
-    Clone a GitHub repository.
-    Returns path to cloned repo or None if failed.
-    """
-    global stop_requested
-
-    try:
-        # Create unique clone directory
-        repo_name = url.split('/')[-1].replace('.git', '')
-        clone_path = temp_dir / repo_name
-
-        if clone_path.exists():
-            shutil.rmtree(clone_path)
-
-        # Add token to URL if provided
-        clone_url = url
-        if token:
-            # Insert token: https://TOKEN@github.com/...
-            if 'https://' in url:
-                clone_url = url.replace('https://', f'https://{token}@')
-
-        log(f"Cloning {repo_name}...")
-
-        if HAS_GITPYTHON:
-            # Use gitpython
-            try:
-                if branch:
-                    git.Repo.clone_from(clone_url, clone_path, branch=branch, depth=1)
-                else:
-                    git.Repo.clone_from(clone_url, clone_path, depth=1)
-            except Exception as e:
-                log(f"  ✗ Clone failed: {e}", [255, 100, 100])
-                return None
-        else:
-            # Fallback to subprocess
-            cmd = ['git', 'clone', '--depth', '1']
-            if branch:
-                cmd.extend(['--branch', branch])
-            cmd.extend([clone_url, str(clone_path)])
-
-            try:
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    check=False
-                )
-
-                if result.returncode != 0:
-                    log(f"  ✗ Clone failed: {result.stderr}", [255, 100, 100])
-                    return None
-            except subprocess.TimeoutExpired:
-                log(f"  ✗ Clone timeout after {timeout}s", [255, 100, 100])
-                return None
-            except FileNotFoundError:
-                log(f"  ✗ git command not found - install git or gitpython", [255, 100, 100])
-                return None
-
-        # Check repo size
-        repo_size_mb = sum(f.stat().st_size for f in clone_path.rglob('*') if f.is_file()) / (1024 * 1024)
-        if repo_size_mb > MAX_REPO_SIZE_MB:
-            log(f"  ⚠️  Repo too large ({repo_size_mb:.1f}MB > {MAX_REPO_SIZE_MB}MB), skipping", [255, 150, 100])
-            shutil.rmtree(clone_path)
-            return None
-
-        log(f"  ✓ Cloned successfully ({repo_size_mb:.1f}MB)", [0, 255, 150])
-        return clone_path
-
-    except Exception as e:
-        log(f"  ✗ Unexpected error: {e}", [255, 100, 100])
-        return None
-
-
-def process_single_github_repo(url: str, branch: Optional[str], token: Optional[str],
-                               temp_dir: Path, config: dict) -> dict:
-    """
-    Process a single GitHub repository.
-    Returns dict with stats: repos_cloned, files_processed, files_failed
-    """
-    global stop_requested
-
-    result = {
-        "repos_cloned": 0,
-        "repos_failed": 0,
-        "files_processed": 0,
-        "files_failed": 0,
-        "total_chars": 0
-    }
-
-    if stop_requested:
-        return result
-
-    # Clone the repository
-    clone_path = clone_github_repo(url, branch, token, temp_dir)
-    if not clone_path:
-        result["repos_failed"] = 1
-        return result
-
-    result["repos_cloned"] = 1
-
-    try:
-        # Scan and process the cloned repository
-        code_files = scan_codebase_folder(str(clone_path))
-        log(f"  Found {len(code_files)} code files in {clone_path.name}", [100, 200, 255])
-
-        # Process each file
-        for full_path, rel_path in code_files:
-            if stop_requested:
-                break
-
-            try:
-                file_result = process_code_file(full_path, rel_path, config)
-
-                if file_result.get('success'):
-                    result["files_processed"] += 1
-                    result["total_chars"] += file_result.get('chars', 0)
-                else:
-                    result["files_failed"] += 1
-
-            except Exception as e:
-                log(f"  Error processing {rel_path}: {e}", [255, 150, 100])
-                result["files_failed"] += 1
-
-    except Exception as e:
-        log(f"  ✗ Error processing repo: {e}", [255, 100, 100])
-        result["repos_failed"] = 1
-    finally:
-        # Remove cloned repo to save space
-        if clone_path.exists():
-            try:
-                shutil.rmtree(clone_path)
-            except Exception:
-                pass
-
-    return result
-
-
-def process_github_repos(github_list_path: str, token: Optional[str], config: dict):
-    """
-    Main function to process GitHub repositories from a list file.
-    Updates global stats dictionary.
-    """
-    global stop_requested, stats
-
-    # Validate list file
-    if not Path(github_list_path).exists():
-        log(f"✗ GitHub list file not found: {github_list_path}", [255, 100, 100])
-        return
-
-    # Parse repository URLs
-    with open(github_list_path, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-
-    repo_specs = []
-    for line in lines:
-        parsed = parse_github_url(line)
-        if parsed:
-            repo_specs.append(parsed)
-
-    if not repo_specs:
-        log("✗ No valid GitHub URLs found in list file", [255, 100, 100])
-        return
-
-    log(f"Found {len(repo_specs)} repositories to process", [100, 200, 255])
-
-    # Add GitHub-specific stats if they don't exist
-    if "repos_total" not in stats:
-        stats["repos_total"] = 0
-        stats["repos_cloned"] = 0
-        stats["repos_failed"] = 0
-
-    stats["repos_total"] = len(repo_specs)
-
-    # Create temporary directory for clones
-    temp_dir = Path(tempfile.mkdtemp(prefix='ntc_github_'))
-    log(f"Using temp directory: {temp_dir}", [150, 150, 160])
-
-    try:
-        start_time = time.time()
-
-        # Process repos with concurrency limit
-        with ThreadPoolExecutor(max_workers=CONCURRENT_REPO_CLONES) as executor:
-            futures = {}
-
-            for url, branch in repo_specs:
-                if stop_requested:
-                    break
-
-                future = executor.submit(
-                    process_single_github_repo,
-                    url, branch, token, temp_dir, config
-                )
-                futures[future] = (url, branch)
-
-            # Collect results
-            for future in as_completed(futures):
-                if stop_requested:
-                    future.cancel()
-                    continue
-
-                try:
-                    result = future.result()
-
-                    # Update global stats
-                    stats["repos_cloned"] += result["repos_cloned"]
-                    stats["repos_failed"] += result["repos_failed"]
-                    stats["success"] += result["files_processed"]
-                    stats["failed"] += result["files_failed"]
-                    stats["total_chars"] += result["total_chars"]
-
-                    # Update UI
-                    update_stats_ui()
-
-                except Exception as e:
-                    log(f"Repository processing error: {e}", [255, 100, 100])
-                    stats["repos_failed"] += 1
-
-        elapsed = time.time() - start_time
-        log(f"✅ GitHub processing complete: {stats['repos_cloned']}/{stats['repos_total']} repos cloned in {elapsed:.1f}s",
-            [0, 255, 200])
-
-    finally:
-        # Cleanup temp directory
-        if temp_dir.exists():
-            try:
-                shutil.rmtree(temp_dir)
-                log(f"Cleaned up temp directory", [150, 150, 160])
-            except Exception as e:
-                log(f"⚠️  Could not remove temp dir: {e}", [255, 150, 100])
-
-
 def scan_codebase_folder(folder_path: str) -> List[Tuple[str, str]]:
     """Recursively scan a folder for code files."""
     code_files = []
@@ -1194,215 +651,6 @@ def format_code_for_training(file_path: str, rel_path: str, content: str,
     return "\n".join(parts)
 
 
-# ================================================================
-# RAG-STYLE CHUNKING FOR CODE - CODEBASE FEATURE
-# ================================================================
-
-def extract_function_boundaries(content: str, language: str) -> List[Tuple[int, int, str]]:
-    """
-    Extract function/class boundaries from code.
-    Returns list of (start_line, end_line, name) tuples.
-    """
-    boundaries = []
-    lines = content.split('\n')
-
-    # Language-specific patterns
-    patterns = {
-        'python': r'^(def|class)\s+(\w+)',
-        'javascript': r'^(function|class|const|let|var)\s+(\w+)',
-        'typescript': r'^(function|class|interface|type|const|let|var)\s+(\w+)',
-        'java': r'^\s*(public|private|protected)?\s*(static)?\s*(class|interface|void|int|String|boolean)\s+(\w+)',
-        'cpp': r'^\s*(class|void|int|float|double|bool|string)\s+(\w+)',
-        'c': r'^\s*(void|int|float|double|char)\s+(\w+)\s*\(',
-        'go': r'^func\s+(\w+)',
-        'rust': r'^(fn|struct|impl|trait)\s+(\w+)',
-        'ruby': r'^(def|class|module)\s+(\w+)',
-        'php': r'^(function|class)\s+(\w+)',
-    }
-
-    # Try to detect language from common patterns
-    lang_key = language.lower().lstrip('.')
-    if lang_key not in patterns:
-        # Default pattern for C-style languages
-        pattern = r'^\s*(function|class|def|fn)\s+(\w+)'
-    else:
-        pattern = patterns[lang_key]
-
-    current_indent = -1
-    start_line = None
-    func_name = None
-
-    for i, line in enumerate(lines):
-        # Check for function/class start
-        match = re.match(pattern, line.strip())
-        if match:
-            # Save previous boundary if exists
-            if start_line is not None:
-                boundaries.append((start_line, i - 1, func_name))
-
-            # Start new boundary
-            start_line = i
-            func_name = match.group(2) if match.lastindex >= 2 else match.group(1)
-            current_indent = len(line) - len(line.lstrip())
-
-        # Check for end of function (decreased indentation or empty line after code)
-        elif start_line is not None and line.strip():
-            indent = len(line) - len(line.lstrip())
-            if indent <= current_indent and i > start_line + 1:
-                boundaries.append((start_line, i - 1, func_name))
-                start_line = None
-                func_name = None
-
-    # Add final boundary
-    if start_line is not None:
-        boundaries.append((start_line, len(lines) - 1, func_name))
-
-    return boundaries
-
-
-def chunk_code_content(content: str, file_path: str, language: str,
-                       chunk_size: int) -> List[Dict]:
-    """
-    Split code content into chunks for RAG.
-    Tries to split on function/class boundaries, falls back to line count.
-
-    Returns list of chunk dicts with metadata.
-    """
-    chunks = []
-    lines = content.split('\n')
-    total_lines = len(lines)
-
-    # Try to extract function boundaries
-    boundaries = extract_function_boundaries(content, language)
-
-    if boundaries:
-        # Split by function boundaries
-        for start, end, name in boundaries:
-            chunk_lines = lines[start:end + 1]
-            chunk_text = '\n'.join(chunk_lines)
-
-            # If chunk is too large, split further
-            if len(chunk_lines) > chunk_size * 2:
-                # Split large functions into sub-chunks
-                for i in range(0, len(chunk_lines), chunk_size):
-                    sub_chunk = '\n'.join(chunk_lines[i:i + chunk_size])
-                    chunks.append({
-                        'text': sub_chunk,
-                        'start_line': start + i,
-                        'end_line': min(start + i + chunk_size - 1, end),
-                        'metadata': {
-                            'function': name,
-                            'part': f"{i // chunk_size + 1}/{(len(chunk_lines) + chunk_size - 1) // chunk_size}"
-                        }
-                    })
-            else:
-                chunks.append({
-                    'text': chunk_text,
-                    'start_line': start,
-                    'end_line': end,
-                    'metadata': {'function': name}
-                })
-
-    # If no boundaries found or gaps exist, use line-based chunking
-    if not boundaries or len(chunks) * chunk_size < total_lines * 0.8:
-        chunks = []
-        for i in range(0, total_lines, chunk_size):
-            chunk_lines = lines[i:i + chunk_size]
-            chunk_text = '\n'.join(chunk_lines)
-
-            chunks.append({
-                'text': chunk_text,
-                'start_line': i,
-                'end_line': min(i + chunk_size - 1, total_lines - 1),
-                'metadata': {'chunk_type': 'line_based'}
-            })
-
-    return chunks
-
-
-def process_code_file_rag(file_path: str, rel_path: str, config: dict,
-                          chunk_size: int) -> dict:
-    """
-    Process a code file with RAG-style chunking.
-    Writes multiple JSONL entries (one per chunk).
-
-    Returns dict with success status and chunk count.
-    """
-    global stop_requested, force_stop, output_file, write_lock
-
-    if stop_requested or force_stop:
-        return {'success': False, 'chunks': 0, 'chars': 0}
-
-    try:
-        # Read file
-        content = read_code_file(file_path, config.get('max_chars', 100000))
-
-        if content is None:
-            return {'success': False, 'chunks': 0, 'chars': 0}
-
-        if len(content.strip()) < config.get('min_chars', 50):
-            return {'success': False, 'chunks': 0, 'chars': 0}
-
-        # Extract metadata
-        metadata = extract_code_metadata(content, file_path)
-        language = os.path.splitext(file_path)[1]
-
-        # Chunk the content
-        chunks = chunk_code_content(content, file_path, language, chunk_size)
-
-        if not chunks:
-            return {'success': False, 'chunks': 0, 'chars': 0}
-
-        # Write chunks to output
-        system_prompt = config.get('system_prompt', DEFAULT_SYSTEM)
-        template_key = config.get('template', DEFAULT_TEMPLATE_KEY)
-
-        total_chars = 0
-        chunks_written = 0
-
-        with write_lock:
-            try:
-                with open(output_file, 'a', encoding='utf-8') as out:
-                    for chunk_id, chunk_data in enumerate(chunks, 1):
-                        if stop_requested or force_stop:
-                            break
-
-                        # Build chunk metadata string
-                        chunk_info = []
-                        chunk_info.append(f"File: {rel_path}")
-                        chunk_info.append(f"Language: {language[1:]}")
-                        chunk_info.append(f"Chunk: {chunk_id}/{len(chunks)}")
-                        chunk_info.append(f"Lines: {chunk_data['start_line']}-{chunk_data['end_line']}")
-
-                        if 'function' in chunk_data['metadata']:
-                            chunk_info.append(f"Function: {chunk_data['metadata']['function']}")
-
-                        chunk_header = "\n".join(chunk_info)
-                        chunk_content = chunk_header + "\n\nCode:\n" + chunk_data['text']
-
-                        # Format for training using existing template system
-                        content_type_cfg = CONTENT_TYPES.get("Code File", CONTENT_TYPES["Custom"])
-                        final_text = build_text(system_prompt, chunk_content, template_key, content_type_cfg)
-
-                        # Write JSONL entry
-                        entry = {"text": final_text}
-                        out.write(json.dumps(entry, ensure_ascii=False) + '\n')
-
-                        chunks_written += 1
-                        total_chars += len(chunk_data['text'])
-
-            except Exception as e:
-                log(f"  [!] Write error: {e}", [255, 100, 100])
-                return {'success': False, 'chunks': chunks_written, 'chars': total_chars}
-
-        log(f"  [+] {rel_path} ({chunks_written} chunks, {total_chars} chars)", [0, 255, 150])
-        return {'success': True, 'chunks': chunks_written, 'chars': total_chars}
-
-    except Exception as e:
-        log(f"Error processing {rel_path} with RAG: {e}", [255, 100, 100])
-        return {'success': False, 'chunks': 0, 'chars': 0}
-
-
 def process_code_file(file_path: str, rel_path: str, config: Dict) -> Dict:
     """Process a single code file for dataset generation."""
     if stop_requested or force_stop:
@@ -1445,23 +693,19 @@ def process_code_file(file_path: str, rel_path: str, config: Dict) -> Dict:
 
 
 def process_codebase_worker():
-    """Worker function for processing code files from a folder or GitHub repos"""
+    """Worker function for processing code files from a folder"""
     global is_running, stop_requested, force_stop, stats
 
     try:
-        # Check if GitHub mode is enabled
-        is_github_mode = dpg.get_value("chk_github_mode") if dpg.does_item_exist("chk_github_mode") else False
-        is_rag_mode = dpg.get_value("chk_rag_output") if dpg.does_item_exist("chk_rag_output") else False
+        folder_path = dpg.get_value("codebase_folder_path")
 
-        # Reset stats
+        if not folder_path or not os.path.isdir(folder_path):
+            log("Invalid folder path", [255, 100, 100])
+            is_running = False
+            return
+
         for k in stats:
             stats[k] = 0
-
-        # Add GitHub-specific stats
-        stats["repos_total"] = 0
-        stats["repos_cloned"] = 0
-        stats["repos_failed"] = 0
-        stats["chunks_written"] = 0
 
         config = {
             "system_prompt": dpg.get_value("system_prompt_input"),
@@ -1470,136 +714,87 @@ def process_codebase_worker():
             "max_chars": dpg.get_value("inp_max_chars"),
         }
 
-        if is_github_mode:
-            # ========== GITHUB MODE ==========
-            github_list = dpg.get_value("inp_github_list")
-            github_token = dpg.get_value("inp_github_token")
+        log(f"Scanning codebase: {folder_path}", [100, 200, 255])
 
-            if not github_token:
-                github_token = None
+        try:
+            code_files = scan_codebase_folder(folder_path)
+        except PermissionError as e:
+            log(f"Permission denied: {e}", [255, 100, 100])
+            is_running = False
+            return
+        except Exception as e:
+            log(f"Error scanning folder: {e}", [255, 100, 100])
+            is_running = False
+            return
 
-            log(f"Starting GitHub repository processing...", [100, 200, 255])
-            log(f"Repository list: {github_list}", [150, 150, 160])
+        if not code_files:
+            log("No code files found", [255, 150, 100])
+            is_running = False
+            return
 
-            # Check if gitpython or git is available
-            if not HAS_GITPYTHON:
+        log(f"Found {len(code_files)} code files", [100, 255, 150])
+
+        num_workers = dpg.get_value("inp_workers")
+        start_time = time.time()
+        processed_count = 0
+
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            futures = {}
+
+            for fp, rp in code_files:
                 try:
-                    subprocess.run(['git', '--version'], capture_output=True, check=True)
-                except (subprocess.CalledProcessError, FileNotFoundError):
-                    log("✗ ERROR: git is not installed or not in PATH", [255, 100, 100])
-                    log("Please install git or gitpython: pip install gitpython", [255, 150, 100])
-                    is_running = False
-                    return
+                    future = executor.submit(process_code_file, fp, rp, config)
+                    futures[future] = (fp, rp)
+                except Exception as e:
+                    log(f"Error submitting task for {rp}: {e}", [255, 150, 100])
+                    continue
 
-            # Process GitHub repos
-            process_github_repos(github_list, github_token, config)
+            for future in as_completed(futures):
+                if force_stop or stop_requested:
+                    log("[STOP] Cancelling remaining tasks...", [255, 200, 100])
+                    for f in futures:
+                        f.cancel()
+                    break
 
-        else:
-            # ========== LOCAL FOLDER MODE ==========
-            folder_path = dpg.get_value("codebase_folder_path")
+                file_path, rel_path = futures[future]
+                processed_count += 1
 
-            if not folder_path or not os.path.isdir(folder_path):
-                log("Invalid folder path", [255, 100, 100])
-                is_running = False
-                return
+                try:
+                    result = future.result(timeout=30)
 
-            log(f"Scanning codebase: {folder_path}", [100, 200, 255])
-
-            try:
-                code_files = scan_codebase_folder(folder_path)
-            except PermissionError as e:
-                log(f"Permission denied: {e}", [255, 100, 100])
-                is_running = False
-                return
-            except Exception as e:
-                log(f"Error scanning folder: {e}", [255, 100, 100])
-                is_running = False
-                return
-
-            if not code_files:
-                log("No code files found", [255, 150, 100])
-                is_running = False
-                return
-
-            log(f"Found {len(code_files)} code files", [100, 255, 150])
-
-            num_workers = dpg.get_value("inp_workers")
-            start_time = time.time()
-            processed_count = 0
-
-            # Get chunk size for RAG mode
-            chunk_size = dpg.get_value("inp_chunk_size") if dpg.does_item_exist(
-                "inp_chunk_size") else DEFAULT_CHUNK_SIZE
-
-            with ThreadPoolExecutor(max_workers=num_workers) as executor:
-                futures = {}
-
-                for fp, rp in code_files:
-                    try:
-                        # Choose processing function based on RAG mode
-                        if is_rag_mode:
-                            future = executor.submit(process_code_file_rag, fp, rp, config, chunk_size)
+                    if result.get('success'):
+                        stats["success"] += 1
+                        stats["total_chars"] += result.get('chars', 0)
+                    else:
+                        if result.get('error'):
+                            stats["failed"] += 1
                         else:
-                            future = executor.submit(process_code_file, fp, rp, config)
-                        futures[future] = (fp, rp)
-                    except Exception as e:
-                        log(f"Error submitting task for {rp}: {e}", [255, 150, 100])
-                        continue
+                            stats["skipped"] += 1
 
-                for future in as_completed(futures):
-                    if force_stop or stop_requested:
-                        log("[STOP] Cancelling remaining tasks...", [255, 200, 100])
-                        for f in futures:
-                            f.cancel()
-                        break
+                except TimeoutError:
+                    stats["failed"] += 1
+                    log(f"  [!] Timeout processing {rel_path}", [255, 100, 100])
+                except Exception as e:
+                    stats["failed"] += 1
+                    log(f"  [!] Error processing {rel_path}: {e}", [255, 100, 100])
 
-                    file_path, rel_path = futures[future]
-                    processed_count += 1
+                elapsed = time.time() - start_time
+                if elapsed > 0:
+                    stats["speed"] = processed_count / elapsed
 
-                    try:
-                        result = future.result(timeout=30)
+                update_stats_ui()
 
-                        if result.get('success'):
-                            stats["success"] += 1
-                            stats["total_chars"] += result.get('chars', 0)
+                progress = processed_count / len(code_files)
+                try:
+                    dpg.set_value("progress_bar", progress)
+                    label = f"Done: {processed_count}/{len(code_files)} | OK: {stats['success']}"
+                    dpg.configure_item("progress_bar", label=label)
+                except:
+                    pass
 
-                            # Track chunks if RAG mode
-                            if is_rag_mode and 'chunks' in result:
-                                stats["chunks_written"] += result.get('chunks', 0)
-                        else:
-                            if result.get('error'):
-                                stats["failed"] += 1
-                            else:
-                                stats["skipped"] += 1
-
-                    except TimeoutError:
-                        stats["failed"] += 1
-                        log(f"  [!] Timeout processing {rel_path}", [255, 100, 100])
-                    except Exception as e:
-                        stats["failed"] += 1
-                        log(f"  [!] Error processing {rel_path}: {e}", [255, 100, 100])
-
-                    elapsed = time.time() - start_time
-                    if elapsed > 0:
-                        stats["speed"] = processed_count / elapsed
-
-                    update_stats_ui()
-
-                    progress = processed_count / len(code_files)
-                    try:
-                        dpg.set_value("progress_bar", progress)
-                        label = f"Done: {processed_count}/{len(code_files)} | OK: {stats['success']}"
-                        dpg.configure_item("progress_bar", label=label)
-                    except:
-                        pass
-
-            elapsed = time.time() - start_time
-            mode_str = "RAG chunking" if is_rag_mode else "standard"
-            log(f"Codebase processing complete ({mode_str}). Success: {stats['success']}, Failed: {stats['failed']}, Time: {elapsed:.1f}s",
-                [0, 255, 200])
-
-            if is_rag_mode:
-                log(f"Total chunks written: {stats['chunks_written']}", [100, 200, 255])
+        elapsed = time.time() - start_time
+        log(f"Codebase processing complete. Success: {stats['success']}, Failed: {stats['failed']}, Time: {elapsed:.1f}s",
+            [0, 255, 200])
 
         if dpg.get_value("chk_sound") and HAS_WINSOUND:
             try:
@@ -1619,38 +814,6 @@ def process_codebase_worker():
             dpg.configure_item("progress_bar", label="IDLE")
         except:
             pass
-
-
-def browse_github_list():
-    """Browse for GitHub repository list file"""
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes('-topmost', True)
-
-    file_path = filedialog.askopenfilename(
-        title="Select GitHub Repository List",
-        filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
-    )
-
-    root.destroy()
-
-    if file_path:
-        dpg.set_value("inp_github_list", file_path)
-        log(f"Selected GitHub list: {file_path}")
-
-
-def update_codebase_button_label():
-    """Update button label based on GitHub mode"""
-    try:
-        is_github = dpg.get_value("chk_github_mode")
-
-        if dpg.does_item_exist("btn_start_codebase"):
-            if is_github:
-                dpg.configure_item("btn_start_codebase", label="START GITHUB REPOS PROCESSING")
-            else:
-                dpg.configure_item("btn_start_codebase", label="START CODEBASE PROCESSING", tag="btn_start_codebase")
-    except:
-        pass
 
 
 def select_codebase_folder():
@@ -2168,10 +1331,6 @@ def update_stats_ui():
             dpg.set_value("stat_junk", str(stats.get("junk_filtered", 0)))
             dpg.set_value("stat_chars", f"{stats['total_chars'] / 1000:.1f}k")
             dpg.set_value("stat_speed", f"{stats['speed']:.1f}/s")
-        if dpg.does_item_exist("stat_repos") and stats.get('repos_total', 0) > 0:
-            dpg.set_value("stat_repos", f"{stats.get('repos_cloned', 0)}/{stats.get('repos_total', 0)}")
-        if dpg.does_item_exist("stat_chunks") and stats.get('chunks_written', 0) > 0:
-            dpg.set_value("stat_chunks", str(stats.get('chunks_written', 0)))
         if dpg.does_item_exist("stat_quality"):
             dpg.set_value("stat_quality", f"{stats.get('avg_quality', 0):.0f}%")
     except:
@@ -2315,6 +1474,8 @@ def build_text(system_override: str, user_content: str, template_key: str, conte
     if "assistant" in tpl:
         # Clean up the content before adding
         cleaned_content = user_content.strip()
+        
+        # Newlines are already correct from extract_text_content()
 
         # Remove common noise patterns from the start
         lines = cleaned_content.split('\n')
@@ -2341,7 +1502,7 @@ def build_text(system_override: str, user_content: str, template_key: str, conte
         # Format the final response
         text_out += tpl["assistant"].format(assistant=cleaned_content)
 
-    return text_out
+    # CRITICAL FIX: Ensure all newlines are actual newlines, not escaped strings\n    # This prevents the model from learning literal \\n patterns\n    text_out = text_out.replace('\\\\n', '\n')  # Fix any double-escaped newlines\n    return text_out
 
 
 # ================================================================
@@ -2664,9 +1825,16 @@ def process_url(url: str, depth: int, config: Dict) -> Tuple[str, bool, int, Lis
 def validate_content_quality(content: str, url: str) -> Tuple[bool, str]:
     """
     Enhanced validation to detect and reject junk pages, list pages, and non-recipe content.
+    OPTIMIZED FOR THEMEALDB - prioritizes /meal/ URLs and uses more lenient thresholds.
     Returns (is_valid, reason_if_invalid)
     """
     content_lower = content.lower()
+    url_lower = url.lower()
+
+    # === CRITICAL FIX 1: PRIORITY BYPASS for /meal/ URLs ===
+    # Always accept /meal/ URLs - these are actual recipe pages on TheMealDB
+    if '/meal/' in url_lower:
+        return True, ""
 
     # Check 1: Detect FAQ/About/Privacy pages by keywords
     junk_keywords = [
@@ -2677,14 +1845,16 @@ def validate_content_quality(content: str, url: str) -> Tuple[bool, str]:
     ]
 
     junk_count = sum(1 for kw in junk_keywords if kw in content_lower)
-    if junk_count >= 2:
+    # === FIX 2: Increased threshold from 2 to 3 to reduce false positives ===
+    if junk_count >= 3:
         return False, "Junk page (FAQ/About/Privacy)"
 
     # Check 2: Detect list/index pages (lots of recipe names, no instructions)
     lines = content.split('\n')
     non_empty_lines = [l.strip() for l in lines if l.strip()]
 
-    if len(non_empty_lines) > 15:
+    # === FIX 3: Increased threshold from 15 to 20 ===
+    if len(non_empty_lines) > 20:
         # Count lines that look like recipe titles (short, capitalized)
         title_like_lines = 0
         for line in non_empty_lines[:30]:  # Check first 30 lines
@@ -2695,44 +1865,47 @@ def validate_content_quality(content: str, url: str) -> Tuple[bool, str]:
                     line.count('\n') == 0):
                 title_like_lines += 1
 
-        # If >60% of lines look like titles, it's probably a list page
-        if title_like_lines > len(non_empty_lines[:30]) * 0.6:
+        # === FIX 4: Increased threshold from 60% to 70% ===
+        if title_like_lines > len(non_empty_lines[:30]) * 0.85:
             return False, "List/index page (many recipe names)"
 
     # Check 3: Detect recipe content indicators
     recipe_indicators = {
         'ingredients': ['ingredient', 'cup', 'tablespoon', 'teaspoon', 'tsp', 'tbsp',
-                        'oz', 'lb', 'gram', 'kg', 'ml', 'pinch', 'dash', 'clove'],
+                        'oz', 'lb', 'gram', 'kg', 'ml', 'liter', 'pinch', 'dash', 'clove'],
         'instructions': ['cook', 'bake', 'mix', 'stir', 'heat', 'add', 'pour', 'chop',
                          'dice', 'slice', 'preheat', 'simmer', 'boil', 'fry', 'roast',
-                         'step 1', 'step 2', 'minutes', 'until'],
+                         'step 1', 'step 2', 'step', 'minutes', 'until', 'serve'],
     }
 
     ingredient_count = sum(1 for word in recipe_indicators['ingredients'] if word in content_lower)
     instruction_count = sum(1 for word in recipe_indicators['instructions'] if word in content_lower)
 
-    # Real recipes have both ingredients and instructions
-    if ingredient_count < 3 and instruction_count < 5:
-        return False, "Missing recipe indicators (no ingredients/instructions)"
+    # === FIX 5: More lenient thresholds and smart filtering ===
+    # Reduced from ingredient_count < 3 and instruction_count < 5
+    # to ingredient_count < 2 and instruction_count < 3
+    if ingredient_count < 2 and instruction_count < 3:
+        # Only reject if it's a known browse/category page
+        if any(pat in url_lower for pat in ['/browse/', '/area/', '/category/', '/tag/', '/letter/']):
+            return False, "Missing recipe indicators (browse/filter page)"
 
     # Check 4: Detect ingredient/category description pages
-    if 'ingredient api' in content_lower or 'category api' in content_lower:
-        return False, "API/ingredient description page"
 
     # Check 5: Number density check (recipes have measurements/times)
-    # Count numbers in content
     number_count = len(re.findall(r'\d+', content))
     words = len(content.split())
 
-    if words > 100:  # Only check if substantial content
+    # === FIX 6: More lenient word count threshold (100 -> 150) ===
+    if words > 150:
         number_density = number_count / words
-        # Real recipes have 5-15% numbers (measurements, temps, times)
-        if number_density < 0.02:  # Less than 2% numbers = probably list page
+        # === FIX 7: Lower threshold from 0.02 to 0.015 ===
+        if number_density < 0.015:
             return False, "Too few numbers (likely not a recipe)"
 
     # Check 6: Sentence structure (lists have many short lines)
     avg_line_length = sum(len(l) for l in non_empty_lines) / max(len(non_empty_lines), 1)
-    if avg_line_length < 25 and len(non_empty_lines) > 20:
+    # === FIX 8: More lenient thresholds (25 -> 20, 20 -> 25) ===
+    if avg_line_length < 20 and len(non_empty_lines) > 25:
         return False, "Too many short lines (likely list page)"
 
     return True, ""
@@ -2769,6 +1942,25 @@ def process_url_v2(url: str, depth: int, config: Dict) -> Dict:
     ]
 
     url_lower = url.lower()
+
+    # === THEMEALDB SMART FILTERING ===
+    # Block browse/navigation pages that waste crawl budget
+    browse_patterns = [
+        # r'/browse/letter/',  # Alphabetical browse (COMMENTED - allow as seeds)
+        # r'/browse/area/',  # Area browse (COMMENTED - these are valuable recipe list pages)
+        # r'/browse/category/',  # Category browse (COMMENTED - these are valuable recipe list pages)
+        r'/api\.php',  # API page
+        r'/privacy',  # Privacy pages
+        r'/terms',  # Terms pages
+        r'/contact',  # Contact pages
+        r'/refunds',  # Refunds pages
+    ]
+
+    for pattern in browse_patterns:
+        if re.search(pattern, url_lower):
+            log(f"  [SKIP-URL] Browse/nav page: {url[:60]}...", [150, 150, 150])
+            return {'success': False, 'error': None, 'chars': 0, 'links': [], 'filtered': True}
+
     for pattern in skip_url_patterns:
         if re.search(pattern, url_lower):
             log(f"  [SKIP-URL] Non-content URL: {url[:60]}...", [150, 150, 150])
@@ -2942,12 +2134,6 @@ def scrape_worker():
         "ignore_quality_short": dpg.get_value("chk_ignore_quality_short"),
         "crawler_enabled": dpg.get_value("chk_crawler"),
         "max_depth": dpg.get_value("inp_max_depth"),
-        "github_mode": dpg.get_value("chk_github_mode") if dpg.does_item_exist("chk_github_mode") else False,
-        "github_list": dpg.get_value("inp_github_list") if dpg.does_item_exist(
-            "inp_github_list") else "github_repos.txt",
-        "github_token": dpg.get_value("inp_github_token") if dpg.does_item_exist("inp_github_token") else "",
-        "rag_output": dpg.get_value("chk_rag_output") if dpg.does_item_exist("chk_rag_output") else False,
-        "chunk_size": dpg.get_value("inp_chunk_size") if dpg.does_item_exist("inp_chunk_size") else DEFAULT_CHUNK_SIZE,
         "links_per_page": dpg.get_value("inp_links_per_page"),
         "max_per_domain": dpg.get_value("inp_max_per_domain"),
         "same_domain": dpg.get_value("chk_same_domain"),
@@ -3071,18 +2257,18 @@ def scrape_worker():
                             current_avg = stats.get("avg_quality", 0)
                             count = stats["success"]
                             stats["avg_quality"] = ((current_avg * (count - 1)) + quality) / count
-
-                        # Add discovered links to crawl queue
-                        if config['crawler_enabled'] and new_links and (depth + 1) < config['max_depth']:
-                            added = crawl_queue.push_many(new_links, depth + 1, config)
-                            if added > 0:
-                                log(f"    [>] +{added} links queued (depth {depth + 1}, max={config['max_depth']})",
-                                    [100, 180, 255])
                     else:
                         if error:
                             stats["failed"] += 1
                         else:
                             stats["skipped"] += 1
+
+                    # Add discovered links to crawl queue (even from filtered/browse pages)
+                    if config['crawler_enabled'] and new_links and (depth + 1) < config['max_depth']:
+                        added = crawl_queue.push_many(new_links, depth + 1, config)
+                        if added > 0:
+                            log(f"    [>] +{added} links queued (depth {depth + 1}, max={config['max_depth']})",
+                                [100, 180, 255])
 
                 except Exception as e:
                     stats["failed"] += 1
@@ -3297,12 +2483,6 @@ def save_config():
         "keywords_out": dpg.get_value("inp_kw_out"),
         "crawler_enabled": dpg.get_value("chk_crawler"),
         "max_depth": dpg.get_value("inp_max_depth"),
-        "github_mode": dpg.get_value("chk_github_mode") if dpg.does_item_exist("chk_github_mode") else False,
-        "github_list": dpg.get_value("inp_github_list") if dpg.does_item_exist(
-            "inp_github_list") else "github_repos.txt",
-        "github_token": dpg.get_value("inp_github_token") if dpg.does_item_exist("inp_github_token") else "",
-        "rag_output": dpg.get_value("chk_rag_output") if dpg.does_item_exist("chk_rag_output") else False,
-        "chunk_size": dpg.get_value("inp_chunk_size") if dpg.does_item_exist("inp_chunk_size") else DEFAULT_CHUNK_SIZE,
     }
     # Add content type settings
     if dpg.does_item_exist("content_type_combo"):
@@ -3341,18 +2521,6 @@ def load_config():
         dpg.set_value("chk_crawler", config.get("crawler_enabled", False))
         dpg.set_value("inp_max_depth", config.get("max_depth", 2))
 
-        # Load GitHub and RAG settings
-        if dpg.does_item_exist("chk_github_mode"):
-            dpg.set_value("chk_github_mode", config.get("github_mode", False))
-        if dpg.does_item_exist("inp_github_list"):
-            dpg.set_value("inp_github_list", config.get("github_list", "github_repos.txt"))
-        if dpg.does_item_exist("inp_github_token"):
-            dpg.set_value("inp_github_token", config.get("github_token", ""))
-        if dpg.does_item_exist("chk_rag_output"):
-            dpg.set_value("chk_rag_output", config.get("rag_output", False))
-        if dpg.does_item_exist("inp_chunk_size"):
-            dpg.set_value("inp_chunk_size", config.get("chunk_size", DEFAULT_CHUNK_SIZE))
-
         # Load content type settings
         if "content_type" in config and dpg.does_item_exist("content_type_combo"):
             dpg.set_value("content_type_combo", config["content_type"])
@@ -3365,6 +2533,79 @@ def load_config():
         log("Config loaded", [0, 255, 100])
     except Exception as e:
         log(f"Load failed: {e}", [255, 100, 100])
+
+
+
+# ================================================================
+# OUTPUT FORMATTING UTILITIES
+# ================================================================
+def convert_jsonl_to_readable(input_file: str = None):
+    """
+    Convert JSONL file to human-readable text format.
+    Creates a new file with '_readable.txt' suffix.
+    """
+    global output_file
+    
+    if input_file is None:
+        input_file = output_file
+    
+    if not os.path.exists(input_file):
+        log(f"[ERROR] File not found: {input_file}", [255, 100, 100])
+        return None
+    
+    base, ext = os.path.splitext(input_file)
+    readable_file = f"{base}_readable.txt"
+    
+    try:
+        entry_count = 0
+        with open(input_file, 'r', encoding='utf-8') as f_in:
+            with open(readable_file, 'w', encoding='utf-8') as f_out:
+                for line_num, line in enumerate(f_in, 1):
+                    try:
+                        data = json.loads(line.strip())
+                        text = data.get('text', '')
+                        # Write with proper formatting
+                        f_out.write(f"{'='*80}\n")
+                        f_out.write(f"Entry {line_num}\n")
+                        f_out.write(f"{'='*80}\n")
+                        f_out.write(text)
+                        f_out.write(f"\n\n")
+                        entry_count += 1
+                    except json.JSONDecodeError:
+                        continue
+        
+        log(f"[OK] Created readable output: {readable_file} ({entry_count} entries)", [100, 255, 100])
+        return readable_file
+    except Exception as e:
+        log(f"[ERROR] Failed to convert: {e}", [255, 100, 100])
+        return None
+
+
+def preview_first_entry():
+    """Preview first entry with proper formatting"""
+    global output_file
+    
+    if not os.path.exists(output_file):
+        log(f"[ERROR] File not found: {output_file}", [255, 100, 100])
+        return
+        
+    try:
+        with open(output_file, 'r', encoding='utf-8') as f:
+            line = f.readline().strip()
+            if line:
+                data = json.loads(line)
+                text = data.get('text', '')
+                log(f"\n{'='*70}\nPreview of First Entry\n{'='*70}", [100, 200, 255])
+                # Show first 2000 chars
+                preview = text[:2000]
+                for line in preview.split('\n')[:40]:
+                    log(line, [200, 200, 200])
+                if len(text) > 2000:
+                    log(f"\n... ({len(text)-2000} more characters)", [150, 150, 150])
+            else:
+                log("[INFO] Output file is empty", [255, 200, 100])
+    except Exception as e:
+        log(f"[ERROR] Failed to preview: {e}", [255, 100, 100])
 
 
 def filter_existing_dataset():
@@ -3537,45 +2778,6 @@ with dpg.window(tag="PrimaryWindow"):
                                hint="Select folder containing code...")
             dpg.add_button(label="Browse...", callback=select_codebase_folder, width=90)
 
-        dpg.add_spacer(height=10)
-        dpg.add_separator()
-        dpg.add_spacer(height=5)
-
-        # GitHub Repository Mode
-        dpg.add_text("GITHUB REPOSITORY MODE", color=[100, 200, 255])
-        dpg.add_checkbox(label="Process GitHub repositories instead of local folder",
-                         tag="chk_github_mode", default_value=False,
-                         callback=lambda: update_codebase_button_label())
-        dpg.add_text("  Process repos from a list file (one URL per line)", color=[100, 100, 120])
-
-        dpg.add_spacer(height=5)
-        with dpg.group(horizontal=True):
-            dpg.add_input_text(label="GitHub List File (.txt)", tag="inp_github_list",
-                               default_value="github_repos.txt", width=-100, readonly=True)
-            dpg.add_button(label="Browse", callback=browse_github_list, width=90)
-        dpg.add_text("  Format: https://github.com/user/repo[@branch]", color=[100, 100, 120])
-
-        dpg.add_spacer(height=5)
-        dpg.add_input_text(label="Personal Access Token (optional)",
-                           tag="inp_github_token", default_value="", width=-1,
-                           password=True, hint="For private repos")
-        dpg.add_text("  Leave blank for public repos only", color=[100, 100, 120])
-
-        dpg.add_spacer(height=10)
-        dpg.add_separator()
-        dpg.add_spacer(height=5)
-
-        # RAG Output Mode
-        dpg.add_text("RAG CHUNKING MODE", color=[150, 200, 255])
-        dpg.add_checkbox(label="Generate chunked RAG-style output",
-                         tag="chk_rag_output", default_value=False)
-        dpg.add_text("  Split code files into smaller chunks for RAG systems", color=[100, 100, 120])
-        with dpg.group(horizontal=True):
-            dpg.add_text("  Chunk Size (lines):")
-            dpg.add_slider_int(tag="inp_chunk_size", default_value=DEFAULT_CHUNK_SIZE,
-                               min_value=MIN_CHUNK_SIZE, max_value=MAX_CHUNK_SIZE, width=200)
-        dpg.add_text("  Chunks split on function/class boundaries when possible", color=[100, 100, 120])
-
         dpg.add_spacer(height=8)
         dpg.add_text("SUPPORTED LANGUAGES", color=[150, 150, 160])
         dpg.add_text("Python, JavaScript, TypeScript, Java, C/C++, C#, Go, Rust, Ruby, PHP,",
@@ -3585,7 +2787,7 @@ with dpg.window(tag="PrimaryWindow"):
 
         dpg.add_spacer(height=10)
 
-        codebase_btn = dpg.add_button(label="START CODEBASE PROCESSING", tag="btn_start_codebase",
+        codebase_btn = dpg.add_button(label="START CODEBASE PROCESSING",
                                       callback=start_codebase_processing,
                                       width=250, height=35)
         with dpg.theme() as codebase_theme:
@@ -3610,7 +2812,7 @@ with dpg.window(tag="PrimaryWindow"):
                      color=[255, 200, 100])
 
     # === CONTENT TYPE ===
-    with dpg.collapsing_header(label="Content Type Configuration", default_open=True):
+    with dpg.collapsing_header(label="Content Type Configuration", default_open=False):
         dpg.add_text("CONTENT TYPE", color=[255, 200, 100])
         dpg.add_text("Select what type of content you're scraping:", color=[150, 150, 160])
         dpg.add_spacer(height=5)
@@ -3835,8 +3037,11 @@ with dpg.window(tag="PrimaryWindow"):
 
         dpg.add_spacer(height=10)
         dpg.add_text("POST-PROCESSING", color=[150, 150, 160])
-        dpg.add_button(label="Filter Existing Dataset", callback=lambda: filter_existing_dataset(), width=200)
-        dpg.add_text("  Removes junk/list pages from current output file", color=[100, 100, 120])
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="Filter Dataset", callback=lambda: filter_existing_dataset(), width=150)
+            dpg.add_button(label="Convert to Readable", callback=lambda: convert_jsonl_to_readable(), width=170)
+            dpg.add_button(label="Preview First", callback=lambda: preview_first_entry(), width=130)
+        dpg.add_text("  Filter: Remove junk | Convert: Create .txt | Preview: Show first entry", color=[100, 100, 120])
 
         dpg.add_spacer(height=10)
         dpg.add_checkbox(label="Log to File", tag="chk_log_file", default_value=False)
@@ -3869,11 +3074,11 @@ with dpg.window(tag="PrimaryWindow"):
     dpg.add_progress_bar(tag="progress_bar", label="IDLE", width=-1, height=18)
     dpg.add_spacer(height=8)
     dpg.add_text("Console:")
-    with dpg.child_window(tag="log_group", height=150, border=True, horizontal_scrollbar=True):
-        dpg.add_text("", tag="log_text", wrap=-1)
+    with dpg.child_window(tag="log_group", height=-35, border=True):
+        dpg.add_text("", tag="log_text", wrap=0)
 
     dpg.add_separator()
-    dpg.add_text(f"NTCompanion Pro | {VERSION}", color=[50, 50, 60])
+    dpg.add_text("NTCompanion", color=[50, 50, 60])
 
 # Init
 load_config()
@@ -3881,7 +3086,7 @@ if os.path.exists(INI_FILE):
     dpg.load_init_file(INI_FILE)
 dpg.set_exit_callback(lambda: dpg.save_init_file(INI_FILE))
 
-dpg.create_viewport(title=f"NTCompanion Pro - {VERSION}", width=1320, height=900, resizable=True)
+dpg.create_viewport(title="NTCompanion", width=1050, height=950, resizable=True)
 dpg.setup_dearpygui()
 dpg.show_viewport()
 dpg.set_primary_window("PrimaryWindow", True)
